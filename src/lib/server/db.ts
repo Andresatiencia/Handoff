@@ -4,8 +4,16 @@ import { dirname, resolve } from "node:path";
 
 let connection: DatabaseSync | undefined;
 
+export class StorageUnavailable extends Error {
+  constructor() {
+    super("The marketplace database is not configured for Vercel. The landing page is available; accounts, listings, and messages need a persistent hosted database.");
+    this.name = "StorageUnavailable";
+  }
+}
+
 export function db() {
   if (connection) return connection;
+  if (process.env.VERCEL === "1" && !process.env.HANDOFF_DB_PATH) throw new StorageUnavailable();
   const path = resolve(process.env.HANDOFF_DB_PATH ?? "data/handoff.sqlite");
   mkdirSync(dirname(path), { recursive: true });
   connection = new DatabaseSync(path);

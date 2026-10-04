@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/server/db";
+import { db, StorageUnavailable } from "@/lib/server/db";
 import { currentUser, requireUser, passwordHash, verifyPassword, startSession, endSession, limit } from "@/lib/server/auth";
 import { HttpError, text, date, university, listingInput } from "@/lib/server/validation";
 import { getListing, listingSelect } from "@/lib/server/listings";
@@ -162,6 +162,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     throw new HttpError(404, "Endpoint not found.");
   } catch (error) {
     if (error instanceof HttpError) return json({ error: error.message }, error.status);
+    if (error instanceof StorageUnavailable) return json({ error: error.message }, 503);
     console.error("Handoff API error", error);
     return json({ error: "The server could not complete this request. Please try again." }, 500);
   }

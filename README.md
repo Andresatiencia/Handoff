@@ -56,7 +56,7 @@ npm run start
 
 The Vercel configuration explicitly selects the Next.js framework and its `.next` build output. This overrides project settings left over from a generic `dist` deployment.
 
-Run one Node server instance with a persistent local disk and HTTPS in front of it. This SQLite setup is intended for a single-server MVP, not ephemeral serverless disks or multiple independent replicas. For those environments, move the database to a shared managed service before deploying.
+Run one Node server instance with a persistent local disk and HTTPS in front of it. This SQLite setup is intended for local development and a single server. It cannot store data on Vercel's serverless filesystem. Vercel deployments show a clear 503 storage-configuration error for marketplace API requests, while the landing page remains available. Hosting the functional account, listing, and messaging backend on Vercel requires migrating the SQLite adapter to a managed Postgres provider such as Neon before connecting a database resource. A Postgres adapter is not included yet.
 
 Keep the database outside publicly served folders and source control. Back up the database regularly; for a simple consistent backup, stop the server and copy the entire database directory (including any SQLite sidecar files), then restart it. Sessions and private messages are stored in that database.
 
