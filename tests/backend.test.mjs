@@ -219,10 +219,27 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.equal((await buyer("conversations", "POST", { listingId, text: "Following up" })).data.conversation.id, threadId);
     secondThreadId = (await stranger("conversations", "POST", { listingId, text: "Interested too" })).data.conversation.id;
     assert.notEqual(threadId, secondThreadId);
+    assert.equal((await seller("conversations")).data.conversations.find(thread => thread.id === threadId).unreadCount, 2);
+    assert.equal((await seller("conversations")).data.conversations.find(thread => thread.id === secondThreadId).unreadCount, 1);
+    assert.equal((await buyer("conversations")).data.conversations[0].unreadCount, 0);
     const received = await seller(`conversations/${threadId}/messages`);
     assert.equal(received.data.messages[0].senderId, buyerId);
+    assert.equal((await seller("conversations")).data.conversations.find(thread => thread.id === threadId).unreadCount, 2, "fetching messages does not mark them read");
+    assert.equal((await seller(`conversations/${threadId}/read`, "POST", { lastMessageId: received.data.messages[0].id })).status, 200);
+    assert.equal((await seller("conversations")).data.conversations.find(thread => thread.id === threadId).unreadCount, 1);
+    assert.equal((await seller(`conversations/${threadId}/read`, "POST", { lastMessageId: received.data.messages[1].id })).status, 200);
+    assert.equal((await seller(`conversations/${threadId}/read`, "POST", { lastMessageId: received.data.messages[0].id })).status, 200);
+    assert.equal((await seller("conversations")).data.conversations.find(thread => thread.id === threadId).unreadCount, 0, "read position never moves backwards");
+    assert.equal((await buyer(`conversations/${secondThreadId}/read`, "POST", { lastMessageId: received.data.messages[1].id })).status, 404);
+    const otherMessageId = (await stranger(`conversations/${secondThreadId}/messages`)).data.messages[0].id;
+    assert.equal((await seller(`conversations/${threadId}/read`, "POST", { lastMessageId: otherMessageId })).status, 400);
+    assert.equal((await seller(`conversations/${threadId}/read`, "POST", { lastMessageId: -1 })).status, 400);
     assert.equal((await seller(`conversations/${threadId}/messages`, "POST", { text: "Yes, let's arrange pickup." })).status, 201);
     assert.equal((await buyer(`conversations/${threadId}/messages`)).data.messages.length, 3);
+    assert.equal((await buyer("conversations")).data.conversations[0].unreadCount, 1);
+    const replyId = (await buyer(`conversations/${threadId}/messages`)).data.messages.at(-1).id;
+    assert.equal((await buyer(`conversations/${threadId}/read`, "POST", { lastMessageId: replyId })).status, 200);
+    assert.equal((await buyer("conversations")).data.conversations[0].unreadCount, 0);
     assert.equal((await stranger(`conversations/${threadId}/messages`)).status, 404);
     assert.equal((await stranger(`conversations/${threadId}/messages`, "POST", { text: "Intrusion" })).status, 404);
     assert.equal((await stranger(`conversations/${secondThreadId}/messages`)).data.messages.length, 1);
@@ -295,6 +312,8 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.equal((await seller("auth/me")).data.user.id, sellerId);
     assert.equal((await anonymous(`listings/${listingId}`)).data.listing.title, item.title);
     assert.equal((await buyer(`conversations/${threadId}/messages`)).data.messages.length, 4);
+    assert.equal((await seller("conversations")).data.conversations.find(thread => thread.id === threadId).unreadCount, 1);
+    assert.equal((await buyer("conversations")).data.conversations[0].unreadCount, 0);
     assert.equal((await buyer(`bundles/${bundleId}`)).data.bundle.claimedByMe, true);
   });
 
@@ -314,6 +333,7 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     const inspection = new DatabaseSync(database, { readOnly: true });
     assert.equal(inspection.prepare("SELECT COUNT(*) AS total FROM conversations").get().total, 0);
     assert.equal(inspection.prepare("SELECT COUNT(*) AS total FROM messages").get().total, 0);
+    assert.equal(inspection.prepare("SELECT COUNT(*) AS total FROM conversation_reads").get().total, 0);
     inspection.close();
   });
 

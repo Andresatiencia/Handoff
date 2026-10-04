@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Conversation, Message } from "@/lib/contracts";
 import { api, useRemote } from "@/lib/api-client";
 import { useAuth, AccountGate } from "./auth-provider";
+import { UnreadBadge } from "./unread-badge";
 
 export function Messages() {
   const params = useSearchParams();
@@ -39,21 +40,39 @@ function Inbox() {
     {error && <p role="alert" className="mt-4 text-red-700">{error} <button onClick={refresh} className="underline">Retry</button></p>}
     <div className="inbox-layout">
       <aside className="inbox-sidebar"><h2 className="mb-4 font-semibold">Conversations</h2>
-        {data?.conversations.length ? <nav aria-label="Conversations" className="space-y-2">{data.conversations.map(thread => <Link href={`/messages?conversation=${thread.id}`} key={thread.id} aria-current={Number(threadId) === thread.id ? "page" : undefined} className={`block rounded-xl p-3 text-sm transition hover:bg-sand ${Number(threadId) === thread.id ? "bg-sand text-forest" : "text-muted"}`}><span className="block break-words font-semibold">{thread.title}</span><span className="mt-1 block text-xs">{user?.id === thread.sellerId ? thread.buyerName : thread.sellerName}</span></Link>)}</nav> : <p className="text-sm leading-6 text-muted">{data ? "Choose Message seller on an item to start a conversation. Buyers who contact you appear here too." : "Loading conversations…"}</p>}
+        {data?.conversations.length ? <nav aria-label="Conversations" className="space-y-2">{data.conversations.map(thread => <Link href={`/messages?conversation=${thread.id}`} key={thread.id} aria-current={Number(threadId) === thread.id ? "page" : undefined} className={`block rounded-xl p-3 text-sm transition hover:bg-sand ${Number(threadId) === thread.id ? "bg-sand text-forest" : "text-muted"}`}><span className="flex items-start justify-between gap-2"><span className="break-words font-semibold">{thread.title}</span><UnreadBadge count={Number(thread.unreadCount)} /></span><span className="mt-1 block text-xs">{user?.id === thread.sellerId ? thread.buyerName : thread.sellerName}</span>{thread.unreadCount > 0 && <span className="sr-only">{thread.unreadCount} unread messages</span>}</Link>)}</nav> : <p className="text-sm leading-6 text-muted">{data ? "Choose Message seller on an item to start a conversation. Buyers who contact you appear here too." : "Loading conversations…"}</p>}
       </aside>
-      {threadId ? <Thread key={`${user?.id}:${threadId}`} id={threadId} /> : <section className="empty-state"><h2 className="text-xl font-semibold">{item ? "Ready to ask about this item?" : "Your next handoff starts here."}</h2><p className="mt-3 text-sm text-muted">{item ? "Send a question to the seller to start the conversation." : "Select a conversation or contact a seller from the marketplace."}</p>{item ? <form onSubmit={start} className="mt-6 text-left"><label htmlFor="first-message" className="text-sm font-semibold">Your message</label><textarea id="first-message" value={firstMessage} onChange={event => setFirstMessage(event.target.value)} disabled={opening} required maxLength={2000} rows={4} className="form-input mt-2 resize-y" placeholder="Hi! Is this still available? I arrive on…" /><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs text-muted">{firstMessage.length}/2000</span><button type="submit" disabled={opening || !firstMessage.trim()} className="button-primary disabled:cursor-not-allowed disabled:opacity-50">{opening ? "Sending…" : "Send message"}</button></div></form> : <Link href="/marketplace" className="button-primary mt-6">Browse items</Link>}{openError && <p role="alert" className="mt-4 text-sm text-red-700">{openError}</p>}</section>}
+      {threadId ? <Thread key={`${user?.id}:${threadId}`} id={threadId} onRead={refresh} /> : <section className="empty-state"><h2 className="text-xl font-semibold">{item ? "Ready to ask about this item?" : "Your next handoff starts here."}</h2><p className="mt-3 text-sm text-muted">{item ? "Send a question to the seller to start the conversation." : "Select a conversation or contact a seller from the marketplace."}</p>{item ? <form onSubmit={start} className="mt-6 text-left"><label htmlFor="first-message" className="text-sm font-semibold">Your message</label><textarea id="first-message" value={firstMessage} onChange={event => setFirstMessage(event.target.value)} disabled={opening} required maxLength={2000} rows={4} className="form-input mt-2 resize-y" placeholder="Hi! Is this still available? I arrive on…" /><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs text-muted">{firstMessage.length}/2000</span><button type="submit" disabled={opening || !firstMessage.trim()} className="button-primary disabled:cursor-not-allowed disabled:opacity-50">{opening ? "Sending…" : "Send message"}</button></div></form> : <Link href="/marketplace" className="button-primary mt-6">Browse items</Link>}{openError && <p role="alert" className="mt-4 text-sm text-red-700">{openError}</p>}</section>}
     </div>
   </main>;
 }
 
-function Thread({ id }: { id: string }) {
+function Thread({ id, onRead }: { id: string; onRead: () => void }) {
   const { user } = useAuth();
   const { data, error, loading, refresh } = useRemote<{ conversation: Conversation; messages: Message[] }>(`conversations/${encodeURIComponent(id)}/messages`, 3000);
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState("");
   const [busy, setBusy] = useState(false);
   const log = useRef<HTMLDivElement>(null);
+  const lastMarked = useRef(0);
   useEffect(() => { if (log.current) log.current.scrollTop = log.current.scrollHeight; }, [data?.messages.length]);
+  const lastMessageId = data?.messages.at(-1)?.id ?? 0;
+  useEffect(() => {
+    if (!user || !data?.messages.some(message => message.senderId !== user.id)) return;
+    const markVisibleMessages = async () => {
+      if (document.visibilityState !== "visible" || lastMessageId <= lastMarked.current) return;
+      lastMarked.current = lastMessageId;
+      try {
+        await api(`conversations/${encodeURIComponent(id)}/read`, { method: "POST", body: JSON.stringify({ lastMessageId }) });
+        onRead();
+        window.dispatchEvent(new Event("handoff:messages-changed"));
+      } catch { lastMarked.current = 0; }
+    };
+    void markVisibleMessages();
+    document.addEventListener("visibilitychange", markVisibleMessages);
+    window.addEventListener("focus", markVisibleMessages);
+    return () => { document.removeEventListener("visibilitychange", markVisibleMessages); window.removeEventListener("focus", markVisibleMessages); };
+  }, [data?.messages, id, lastMessageId, onRead, user]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

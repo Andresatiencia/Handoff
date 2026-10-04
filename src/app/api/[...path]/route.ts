@@ -11,7 +11,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "no-store" } });
 const conversationSelect = `SELECT c.id,c."listingId",c."buyerId",l."sellerId",l.title,l.status,
-  b.name AS "buyerName",s.name AS "sellerName" FROM conversations c JOIN listings l ON l.id=c."listingId"
+  b.name AS "buyerName",s.name AS "sellerName",
+  CAST((SELECT COUNT(*) FROM messages m WHERE m."conversationId"=c.id AND m."senderId"<>$3
+    AND m.id>COALESCE((SELECT r."lastMessageId" FROM conversation_reads r
+      WHERE r."conversationId"=c.id AND r."userId"=$3),0)) AS INTEGER) AS "unreadCount"
+  FROM conversations c JOIN listings l ON l.id=c."listingId"
   JOIN users b ON b.id=c."buyerId" JOIN users s ON s.id=l."sellerId"`;
 
 async function body(request: NextRequest, maxSize = 16384) {
@@ -211,7 +215,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     if (route === "conversations" && method === "GET") {
       const user = await requireUser(request);
       return json({ conversations: await rows(`${conversationSelect} WHERE (c."buyerId"=$1 OR l."sellerId"=$2)
-        AND EXISTS (SELECT 1 FROM messages m WHERE m."conversationId"=c.id) ORDER BY c.id DESC`, user.id, user.id) });
+        AND EXISTS (SELECT 1 FROM messages m WHERE m."conversationId"=c.id) ORDER BY c.id DESC`, user.id, user.id, user.id) });
     }
     if (route === "conversations" && method === "POST") {
       const user = await requireUser(request); await limit(`conversation:${user.id}`, 60, 3600000);
@@ -246,6 +250,19 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
         const result = await row<{ id: number }>(`INSERT INTO messages("conversationId","senderId",text,"createdAt") VALUES($1,$2,$3,$4) RETURNING id`, thread.id, user.id, content, new Date().toISOString());
         return json({ id: Number(result!.id) }, 201);
       }
+    }
+    if (parts[0] === "conversations" && /^\d+$/.test(parts[1] ?? "") && parts[2] === "read" && parts.length === 3 && method === "POST") {
+      const user = await requireUser(request);
+      const thread = await conversation(Number(parts[1]), user.id);
+      const data = await body(request);
+      if (!Number.isSafeInteger(data.lastMessageId) || Number(data.lastMessageId) < 1) throw new HttpError(400, "Choose a message to mark as read.");
+      const result = await rows<{ lastMessageId: number }>(`INSERT INTO conversation_reads("conversationId","userId","lastMessageId")
+        SELECT $1,$2,$3 WHERE EXISTS (SELECT 1 FROM messages WHERE "conversationId"=$1 AND id=$3)
+        ON CONFLICT("conversationId","userId") DO UPDATE SET "lastMessageId"=CASE
+          WHEN excluded."lastMessageId">conversation_reads."lastMessageId" THEN excluded."lastMessageId"
+          ELSE conversation_reads."lastMessageId" END RETURNING "lastMessageId"`, thread.id, user.id, Number(data.lastMessageId));
+      if (!result.length) throw new HttpError(400, "That message is not in this conversation.");
+      return json({ lastMessageId: Number(result[0].lastMessageId) });
     }
     throw new HttpError(404, "Endpoint not found.");
   } catch (error) {
