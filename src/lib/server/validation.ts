@@ -42,8 +42,24 @@ export function listingInput(data: Record<string, unknown>) {
   if (availableFrom > availableUntil) throw new HttpError(400, "Availability must end on or after its start date.");
   if (data.departure && availableUntil > date(data.departure)) throw new HttpError(400, "Availability must end by your leaving date.");
   const art: Record<Category, Listing["illustration"]> = {
-    Kitchen: "kitchen", Bedroom: "lamp", Winter: "coat", School: "lamp", Electronics: "microwave", Furniture: "chair",
+    Kitchen: "kitchen", Bedroom: "bedding", Winter: "coat", School: "books", Electronics: "microwave", Furniture: "chair",
+  };
+  // A title that names the object beats its category default, so a mini fridge
+  // and a microwave do not share one drawing just because both are Electronics.
+  const named: [RegExp, Listing["illustration"]][] = [
+    [/fridge|refrigerator/, "fridge"], [/microwave/, "microwave"], [/lamp/, "lamp"],
+    [/chair|stool/, "chair"], [/coat|jacket|parka/, "coat"], [/book|textbook/, "books"],
+    [/bedding|sheet|pillow|duvet|blanket|comforter|mattress/, "bedding"],
+    [/pan|pot|dish|plate|mug|cutlery|kettle/, "kitchen"],
+  ];
+  const haystack = title.toLowerCase();
+  const illustration = named.find(([pattern]) => pattern.test(haystack))?.[1] ?? art[category];
+  // Each category gets its own muted ground so a grid of cards reads as a set
+  // rather than one repeated tile.
+  const tint: Record<Category, string> = {
+    Kitchen: "#f2e7d5", Bedroom: "#e6ebe4", Winter: "#dfe7ec",
+    School: "#ece6dc", Electronics: "#e3eaea", Furniture: "#eee4dc",
   };
   return { title, description, university: campus, category, condition: String(data.condition),
-    priceCents: Math.round(data.price * 100), availableFrom, availableUntil, illustration: art[category] };
+    priceCents: Math.round(data.price * 100), availableFrom, availableUntil, illustration, color: tint[category] };
 }

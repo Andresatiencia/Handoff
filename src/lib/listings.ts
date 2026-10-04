@@ -4,7 +4,7 @@ export type Listing = {
   id: number; title: string; category: Category; price: number;
   condition: "Like new" | "Good" | "Used"; availableFrom: string;
   availableUntil: string; status: "available" | "reserved" | "sold";
-  illustration: "fridge" | "coat" | "kitchen" | "lamp" | "microwave" | "chair";
+  illustration: "fridge" | "coat" | "kitchen" | "lamp" | "microwave" | "chair" | "books" | "bedding";
   color: string;
   sellerName?: string;
   university?: string;

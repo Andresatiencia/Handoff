@@ -107,8 +107,8 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     if (route === "listings" && method === "POST") {
       const user = requireUser(request); limit(`post:${user.id}`, 30, 3600000);
       const data = listingInput(await body(request));
-      const result = db().prepare(`INSERT INTO listings(sellerId,title,description,university,category,priceCents,condition,availableFrom,availableUntil,illustration)
-        VALUES(?,?,?,?,?,?,?,?,?,?)`).run(user.id, data.title, data.description, data.university, data.category, data.priceCents, data.condition, data.availableFrom, data.availableUntil, data.illustration);
+      const result = db().prepare(`INSERT INTO listings(sellerId,title,description,university,category,priceCents,condition,availableFrom,availableUntil,illustration,color)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(user.id, data.title, data.description, data.university, data.category, data.priceCents, data.condition, data.availableFrom, data.availableUntil, data.illustration, data.color);
       return json({ listing: getListing(Number(result.lastInsertRowid)) }, 201);
     }
     if (parts[0] === "listings" && parts.length === 2 && /^\d+$/.test(parts[1])) {
