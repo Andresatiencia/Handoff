@@ -1,9 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { firebaseAuth, firebaseConfigured } from "./firebase-client";
 
 export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`/api/${path}`, { ...options, cache: "no-store", headers: { "Content-Type": "application/json", ...options.headers } });
+  const headers = new Headers(options.headers);
+  if (!headers.has("Content-Type") && options.body) headers.set("Content-Type", "application/json");
+  if (firebaseConfigured()) {
+    const auth = firebaseAuth();
+    await auth.authStateReady();
+    if (auth.currentUser) headers.set("Authorization", `Bearer ${await auth.currentUser.getIdToken()}`);
+  }
+  const response = await fetch(`/api/${path}`, { ...options, cache: "no-store", headers });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Request failed. Please try again.");
   return data as T;

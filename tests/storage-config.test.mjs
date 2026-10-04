@@ -46,12 +46,12 @@ test("Vercel rejects missing or unsafe hosted storage without creating a local d
       assert.equal(response.status, 503);
       assert.match((await response.json()).error, /database is not configured/);
       assert.equal((await fetch(origin)).status, 200);
-      const signup = await fetch(`${origin}/api/auth/register`, {
+      const profile = await fetch(`${origin}/api/auth/profile`, {
         method: "POST", headers: { Origin: origin, "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "Test student", email: "test@example.com", password: "test-password-2026!", university: "University of Central Missouri" }),
+        body: JSON.stringify({ name: "Test student", university: "University of Central Missouri" }),
       });
-      assert.equal(signup.status, 503);
-      assert.equal(signup.headers.get("set-cookie"), null);
+      assert.equal(profile.status, 401);
+      assert.equal(profile.headers.get("set-cookie"), null);
       await assert.rejects(access(database));
     } finally {
       if (server.exitCode === null) {

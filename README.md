@@ -1,102 +1,39 @@
 # Handoff
 
-A working student marketplace for the University of Central Missouri, built with Next.js App Router, TypeScript, and Tailwind CSS.
+Student marketplace for the University of Central Missouri, built with Next.js App Router, TypeScript, Tailwind CSS, Firebase Authentication, and the existing Handoff database.
 
 ## Run locally
 
-Use **Node.js 24 or newer**. The database adapter uses SQLite locally, Neon Postgres on the connected Vercel project, and also supports Turso when its credentials are configured.
+Use Node.js 24 or newer. Copy `.env.example` to the ignored `.env.local` and fill in the Firebase Web App and Admin values. Enable Email/Password in Firebase Authentication and add `localhost` to Authorized domains. Then:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. No cloud account, API keys, database installation, or seed credentials are required for local development. Without hosted credentials, the server creates `data/handoff.sqlite` and its schema on the first database request. Existing local SQLite data remains readable by the adapter.
+Open http://localhost:3000. The local database defaults to `data/handoff.sqlite`; no database installation is needed. A hosted Neon `DATABASE_URL` or Turso credentials can be supplied instead. Use the same hostname in the browser and in `APP_ORIGIN` if set, because API writes enforce the request origin.
 
-Use the same host and port in the browser and in `APP_ORIGIN` when that variable is set. The API compares write requests with this exact origin; mixing `localhost` and `127.0.0.1` can return “Request origin is not allowed.” For a review with a separate local database, start the server with `APP_ORIGIN=http://127.0.0.1:3000`, `HANDOFF_DB_PATH=data/handoff-review.sqlite`, and empty `DATABASE_URL`, `TURSO_DATABASE_URL`, and `TURSO_AUTH_TOKEN`, then use only `http://127.0.0.1:3000` in the browser. Keep the origin check enabled.
+Create a Firebase account from **Sign in → Create account**. Firebase sends the verification email. Until the link is used, the account can browse public items and bundles. On returning to Handoff, open `/verify-email` or press **I've verified my email** to refresh Firebase's state. Posting, claiming, managing listings, and messaging require a server-verified Firebase ID token with `email_verified=true`. Password reset and verification resend are handled by Firebase.
 
-Create an account at **Sign in → Create account**, verify it using the link printed in the local server console, then post your first item. The live marketplace starts empty; old mock listings and browser-only conversations are not imported because they have no verified account owner. Landing-page illustrations are decorative examples.
+The marketplace still stores profiles, listings, photos, bundles, claims, conversations, and messages in the existing SQLite, Neon, or Turso database. Firebase Auth does not require Firestore. New profiles contain a unique `firebaseUid` while preserving the numeric Handoff user ID used by existing marketplace records. A Firebase account whose email matches an older Handoff profile must enter its old Handoff password once on the account page to link it; the old hash is then replaced with a non-login marker. An older account cannot use its former Handoff password to sign in directly anymore. Its Firebase email must be verified even if the former Handoff account was marked verified. Existing Google-only profiles without a usable Handoff password need an administrator-assisted identity-checked link; they are never linked automatically by email alone. No profile or marketplace data is deleted.
 
-The Hands design uses illustrative cutout objects on the home page; marketplace cards serve each listing's actual uploaded photo when one exists. The `public/brand` fonts carry their OFL licenses, and the illustrative WebP files carry source notes.
+## Firebase Console setup
 
-## Try a real handoff
+1. Create a project in [Firebase Console](https://console.firebase.google.com/). A custom domain is not required for Firebase's built-in verification and password-reset emails.
+2. In **Project settings → General → Your apps**, add a **Web app**. Copy its `firebaseConfig` fields into the six `NEXT_PUBLIC_FIREBASE_*` variables listed in `.env.example`. These are browser configuration values, not service account secrets.
+3. In **Build → Authentication → Sign-in method**, enable **Email/Password**. Google Sign-In is not used.
+4. In **Authentication → Settings → Authorized domains**, add `handoff-opal.vercel.app`. Add `localhost` for local development. Add each Preview/custom hostname only if users will authenticate there. Do not include a scheme or path.
+5. In **Project settings → Service accounts**, generate a new private key for the Firebase Admin SDK and download the JSON once. From that JSON, set `FIREBASE_PROJECT_ID` (`project_id`), `FIREBASE_CLIENT_EMAIL` (`client_email`), and `FIREBASE_PRIVATE_KEY` (`private_key`). Store the private key as a Vercel secret with its newlines preserved, or as literal `\n` escapes. Never put Admin values in `NEXT_PUBLIC_` variables or source control.
+6. In **Vercel → Handoff → Settings → Environment Variables**, add the six public Web App variables and three Admin variables to **Production**. Use the same Firebase project for all nine values. If Preview is needed, configure its variables and authorize its hostname separately. Existing `DATABASE_URL` from Neon remains required for marketplace persistence.
+7. Redeploy Handoff after saving environment variables. Firebase Web App values are embedded in the Next.js build, so changing them requires a rebuild. Test registration, the verification link, sign-in, and password reset at https://handoff-opal.vercel.app.
 
-1. Create and verify a seller account in your normal browser. Post an item with its availability dates and an optional product photo.
-2. Open an incognito window or a second browser and create and verify a buyer account.
-3. Browse the marketplace and choose **Message seller**. Send a message.
-4. In the seller's browser, open **Messages** and reply. Messages refresh every three seconds.
-5. Each buyer has a separate private conversation with the seller.
-6. Use **My account → Manage my listings** to mark an item available, reserved, or sold/handed off, or to delete it.
+Do not configure `FIREBASE_AUTH_EMULATOR_HOST` on Vercel. `RESEND_API_KEY` and `HANDOFF_EMAIL_FROM` are no longer used for account verification and may remain only for a future unrelated email feature. The former Google OAuth variables and callback are no longer used. `APP_ORIGIN` is optional unless a reverse proxy requires a fixed public origin.
 
-Both browsers must access the **same running Handoff server**. Different localhost ports or separate server databases are separate installations. Other devices can use a reachable server address; internet-wide access requires hosting.
+## Marketplace behavior
 
-## Implemented behavior
+Sellers post items with availability dates, an optional photo, a price of at most two decimal places, and a university. They can change status or delete their own listings. Buyers can filter by category, date, status, university, search, and inclusive price range, and can message sellers. Sellers can create bundles of 2–12 items with an availability window and estimated retail cost; buyers can reserve a whole bundle without payment. Match, timing, and savings displays use entered items, needs, dates, and estimated values. The five labeled demo bundles have per-user demo reservations. Only University of Central Missouri is selectable; enrollment is self-reported. Individual listings are not directly claimed; pickup is arranged by message.
 
-Bundles: Sellers can open **Create a bundle** from the marketplace, group 2–12 named items with conditions and an availability window, and enter a bundle price and estimated new cost. Arriving students can add specific needs on the arrival form; cards calculate coverage, timing, and estimated savings. A signed-in buyer can reserve a whole bundle in one action. The five labeled demo bundles have personal demo reservations and do not arrange pickup; a bundle posted by a real account can be reserved by only one buyer.
-
-- Registration, sign-in, sign-out, seven-day server-side sessions, and account ownership.
-- Google Sign-In and email/password accounts share Handoff users and sessions. A successful Google sign-in verifies the account email. When Resend is configured, password accounts receive a 24-hour, single-use verification link. Unverified accounts, including older accounts with unknown mailbox ownership, can browse but cannot post, claim, or send messages.
-- Salted scrypt password hashes and random session tokens stored as SHA-256 hashes; HttpOnly, SameSite cookies, with Secure cookies when the configured origin uses HTTPS.
-- Persistent shared listings, seller status management and deletion, server validation, product photos, and prices stored as integer cents. The price form accepts at most two decimal places.
-- Seller-created bundles and database-backed reservations. Bundle matches and savings use entered items, needs, dates, and estimated retail values; no payment is collected.
-- Public browsing with category, search, status, university, inclusive arrival-date, and optional minimum/maximum price filters. Price ranges include their endpoints and can be shared through `minPrice` and `maxPrice` URL parameters.
-- Only University of Central Missouri is selectable; the API enforces this restriction.
-- Private per-buyer/per-listing conversations, sender identity from the session, and polling for new messages.
-- Database-backed rate limits for authentication, listing creation, conversations, and messages.
-- Same-origin checks on writes, request-size limits, parameterized SQL, and participant/ownership checks.
-- Loading, empty, and error states. Failed writes do not display a success confirmation.
-
-Selecting a university is self-reported affiliation; it does not verify enrollment. Payments, password recovery, notifications, moderation, and buyer claiming of individual listings are not implemented. Sellers reserve and close individual listings manually; pickup arrangements for those items happen in messages. Deleting a listing also permanently removes its photo and associated conversations and messages. These are follow-up features, not simulated backend behavior.
-
-## Configuration and hosting
-
-### Email verification
-
-To activate password-account email verification, verify a sending domain in [Resend](https://resend.com/docs/dashboard/domains/introduction), then set both `RESEND_API_KEY` and `HANDOFF_EMAIL_FROM` in the Vercel project's environment variables. Example sender: `Handoff <verify@your-domain.example>`. Redeploy after adding them. The server calls Resend's email API directly; no package is required. Do not put the API key in a `NEXT_PUBLIC_` variable or commit it. Without both settings, password accounts can still register and browse, but cannot post, claim, or message until their email is verified through Resend or Google. Older accounts marked `legacy` are likewise unverified.
-
-### Google Sign-In
-
-Create an OAuth 2.0 **Web application** client in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) and configure its OAuth consent screen. Add `https://handoff-opal.vercel.app/api/auth/google/callback` as an **Authorized redirect URI**. If the consent screen is in Testing, add each hackathon participant as a test user; publishing the consent screen allows other Google accounts within Google's applicable limits. Request only `openid`, `email`, and `profile` scopes.
-
-In Vercel's Handoff project, add `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `APP_ORIGIN=https://handoff-opal.vercel.app` to the **Production** environment, then redeploy. Add the same values to Preview only if you also register that preview site's exact callback URL; a fixed production `APP_ORIGIN` intentionally rejects sign-in from a different host. For local testing, register `http://localhost:3000/api/auth/google/callback` as a second redirect URI and use `APP_ORIGIN=http://localhost:3000` with the same Google client credentials in the ignored `.env.local` file. Never use `NEXT_PUBLIC_` for the client secret.
-
-Google uses the authorization-code flow with PKCE, state, nonce, and a server-verified ID token. Only Gmail and Google Workspace addresses are accepted for verified status, because Google cannot guarantee ongoing ownership of third-party mailbox addresses. Its stable account ID is stored on the existing user record; Handoff issues its existing seven-day session cookie. A password account with the same email must first sign in with its password and use **Connect Google** on the account page. This prevents a Google login from silently taking over a preexisting account. Once linked, either method signs in to the same user and their listings and messages remain attached.
-
-During local `npm run dev`, verification links are written to the server console if Resend is not configured. This is a local development aid only. The link expires after 24 hours and can be used once. Users can request a replacement from their account page; this invalidates the previous link. Opening the link presents a confirmation button so email previewers do not verify accounts merely by loading the URL. Confirming ownership proves access to the mailbox at that moment, not that the mailbox will remain active forever.
-
-Bundle claims reserve the grouped items in Handoff. Pickup coordination for bundles is not yet integrated with item messaging. Estimated new costs are seller-entered, and arrival needs travel in the marketplace URL rather than an account profile.
-
-See `.env.example`. Local file configuration is optional:
-
-- `HANDOFF_DB_PATH`: database file location; defaults to `data/handoff.sqlite`.
-- `DATABASE_URL`: Neon Postgres connection string. The connected Vercel marketplace resource sets this automatically for production, preview, and development.
-- `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`: optional alternative hosted Turso connection. Neon takes precedence when both are configured.
-- `APP_ORIGIN`: exact public origin, such as `https://handoff.example.com` (no trailing slash). Set this when deploying behind an HTTPS reverse proxy. It controls write-origin checks and Secure session cookies.
-
-### Vercel hosted database
-
-Handoff's Vercel project is connected to a Neon Postgres resource. The integration supplies `DATABASE_URL` to the server for production, preview, and development. Deploy the current branch; the first API request creates tables and indexes. Accounts, sessions, listings, product photos, and messages are stored in the hosted database and persist across deployments. Set `APP_ORIGIN` only if a reverse proxy requires a fixed public origin; otherwise write-origin checks use the incoming request's origin.
-
-Turso remains supported if `DATABASE_URL` is absent: set both `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` as server-only environment variables. Do not prefix database credentials with `NEXT_PUBLIC_` or commit real values. To initialize either hosted database explicitly before deploying, put its credentials in the ignored `.env.local` file and run `npm run db:setup`.
-
-The Vercel filesystem is never used for account storage. On Vercel, missing credentials or unsafe Turso URLs return a 503 configuration error instead of silently using a temporary SQLite file. The landing page remains available. If only one Turso variable is set locally, the server also rejects that incomplete configuration.
-
-Local accounts are not automatically uploaded to hosted storage. If existing local data must be retained online, arrange an explicit import before inviting users. Use the provider's backup and recovery facilities for hosted data rather than copying files from Vercel.
-
-Product photos accept JPEG, PNG, and WebP files up to 10 MB. The browser converts them to smaller JPEG images before posting; the API validates the image signature and limits storage to 750 KB per image. Images are stored with listings in the database. Listings without a photo show a category illustration.
-
-Production commands:
-
-```sh
-npm run build
-npm run start
-```
-
-The Vercel configuration explicitly selects the Next.js framework and its `.next` build output. This overrides project settings left over from a generic `dist` deployment.
-
-For deployments using the local file adapter, run one Node server instance with a persistent local disk and HTTPS in front of it. Multiple independent replicas and ephemeral serverless disks require hosted Postgres or Turso.
-
-Keep the database outside publicly served folders and source control. Back up the database regularly; for a simple consistent backup, stop the server and copy the entire database directory (including any SQLite sidecar files), then restart it. Sessions and private messages are stored in that database.
+The connected Vercel project uses Neon through `DATABASE_URL`. Turso is supported with `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` when Neon is absent. Never expose database credentials to the browser. On Vercel, missing hosted database credentials produce a 503 rather than creating temporary SQLite data. Product photos are resized in the browser and stored with listings; the API validates the image and limits stored data to 750 KB. Existing local SQLite accounts do not automatically move to Neon.
 
 ## Checks
 
@@ -107,30 +44,15 @@ npm run build
 npm run test:integration
 ```
 
-Integration tests require an existing production build. They launch isolated servers on temporary ports with temporary databases, then test multiple users, university and input validation, date filtering, listing ownership, private messages, CSRF checks, logout, and persistence across restart. They also verify that invalid hosted configurations cannot create a local database or issue a registration session. The tests explicitly ignore inherited Turso credentials and never use a real hosted application database.
+The integration runner starts an isolated Firebase Auth Emulator and local Handoff server with temporary databases. It exercises registration, verification/resend, reset, verified and unverified authorization, profile linking, and invalid/expired tokens. No production Firebase or marketplace database is used.
 
-## Structure
+## Structure and API
 
-- `src/app/api/[...path]/route.ts`: HTTP API and authorization.
-- `src/lib/server/`: SQLite, Neon, and Turso schema and queries, authentication, and validation.
-- `src/lib/photo.ts`: browser-side photo resizing for listing posts.
-- `src/lib/api-client.ts`: client requests and polling.
-- `src/lib/contracts.ts`: shared API types.
-- `src/lib/universities.ts`: supported university list.
-- `src/components/auth-provider.tsx`: account state and protected screens.
-- `src/components/account.tsx`, `sell-form.tsx`, `marketplace.tsx`, `messages.tsx`: live application flows.
-- `tests/backend.test.mjs`: end-to-end API integration tests.
+- `src/lib/firebase-client.ts` and `src/components/auth-provider.tsx`: browser Firebase initialization and auth state.
+- `src/lib/server/firebase-admin.ts` and `src/lib/server/auth.ts`: ID token validation and API authorization.
+- `src/lib/server/db.ts`: existing database adapters and additive `firebaseUid` migration.
+- `src/app/api/[...path]/route.ts`: marketplace routes and Handoff profile link endpoints.
+- `src/components/account.tsx` and `verify-email-prompt.tsx`: registration, login, reset, and verification UI.
+- `tests/backend.test.mjs`: Firebase Emulator integration tests.
 
-Routes: `/`, `/account`, `/verify-email`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/bundles/new`, `/bundles/:id`, `/messages`.
-
-API:
-- `GET /api/auth/me`; `POST /api/auth/register|login|logout`.
-- `POST /api/auth/resend-verification`; `POST /api/auth/verify-email`.
-- `GET/POST /api/listings`; `GET/PATCH/DELETE /api/listings/:id` (PATCH changes status; DELETE is seller-only); `GET /api/listings/:id/image`.
-- `GET/POST /api/bundles`; `GET /api/bundles/:id`; `POST /api/bundles/:id/claim`.
-- `GET/POST /api/conversations`.
-- `GET/POST /api/conversations/:id/messages`.
-
-Write requests require JSON and an Origin header matching the app origin. Cookies identify the account. Hosted queries use `@neondatabase/serverless` or `@libsql/client`.
-
-Reference APIs: [Neon serverless driver](https://neon.com/docs/serverless/serverless-driver), [libSQL client](https://tursodatabase.github.io/libsql-client-ts/), [Next.js route handlers](https://nextjs.org/docs/app/api-reference/file-conventions/route).
+Account endpoints: `GET /api/auth/me`, `POST /api/auth/profile`, and `POST /api/auth/migrate`. Authenticated requests send a Firebase ID token in `Authorization: Bearer …`; protected writes require a verified email. Marketplace routes include `/api/listings`, `/api/bundles`, `/api/conversations`, and their item/detail actions. Writes also require a matching Origin header. The former Handoff session cookies, password sign-in endpoints, Google OAuth endpoints, and custom verification endpoints are no longer used. Legacy session and verification tables remain in the database to avoid deleting old data.

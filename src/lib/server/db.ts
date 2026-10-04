@@ -29,15 +29,7 @@ function sqlite() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE, "passwordHash" TEXT NOT NULL, university TEXT NOT NULL,
-      "emailVerifiedAt" TEXT DEFAULT 'legacy', "googleSub" TEXT UNIQUE
-    );
-    CREATE TABLE IF NOT EXISTS email_verifications (
-      "userId" INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-      "tokenHash" TEXT NOT NULL UNIQUE, "expiresAt" INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS sessions (
-      "tokenHash" TEXT PRIMARY KEY, "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      "expiresAt" INTEGER NOT NULL
+      "emailVerifiedAt" TEXT DEFAULT 'legacy', "firebaseUid" TEXT UNIQUE
     );
     CREATE TABLE IF NOT EXISTS listings (
       id INTEGER PRIMARY KEY AUTOINCREMENT, "sellerId" INTEGER NOT NULL REFERENCES users(id),
@@ -77,8 +69,8 @@ function sqlite() {
   const columns = connection.prepare("PRAGMA table_info(listings)").all() as { name: string }[];
   const userColumns = connection.prepare("PRAGMA table_info(users)").all() as { name: string }[];
   if (!userColumns.some(column => column.name === "emailVerifiedAt")) connection.exec('ALTER TABLE users ADD COLUMN "emailVerifiedAt" TEXT DEFAULT \'legacy\'');
-  if (!userColumns.some(column => column.name === "googleSub")) connection.exec('ALTER TABLE users ADD COLUMN "googleSub" TEXT');
-  connection.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users("googleSub")');
+  if (!userColumns.some(column => column.name === "firebaseUid")) connection.exec('ALTER TABLE users ADD COLUMN "firebaseUid" TEXT');
+  connection.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_firebase_uid ON users("firebaseUid")');
   if (!columns.some(column => column.name === "imageData")) connection.exec('ALTER TABLE listings ADD COLUMN "imageData" TEXT');
   if (!columns.some(column => column.name === "imageMime")) connection.exec('ALTER TABLE listings ADD COLUMN "imageMime" TEXT');
   return connection;
@@ -102,9 +94,7 @@ async function turso() {
     }
     const client = createClient({ url, authToken, intMode: "number" });
     const schema = [
-      `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, "passwordHash" TEXT NOT NULL, university TEXT NOT NULL, "emailVerifiedAt" TEXT DEFAULT 'legacy', "googleSub" TEXT UNIQUE)`,
-      `CREATE TABLE IF NOT EXISTS email_verifications ("userId" INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, "tokenHash" TEXT NOT NULL UNIQUE, "expiresAt" INTEGER NOT NULL)`,
-      `CREATE TABLE IF NOT EXISTS sessions ("tokenHash" TEXT PRIMARY KEY, "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "expiresAt" INTEGER NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, "passwordHash" TEXT NOT NULL, university TEXT NOT NULL, "emailVerifiedAt" TEXT DEFAULT 'legacy', "firebaseUid" TEXT UNIQUE)`,
       `CREATE TABLE IF NOT EXISTS listings (id INTEGER PRIMARY KEY AUTOINCREMENT, "sellerId" INTEGER NOT NULL REFERENCES users(id), title TEXT NOT NULL, description TEXT NOT NULL, university TEXT NOT NULL, category TEXT NOT NULL, "priceCents" INTEGER NOT NULL CHECK("priceCents" >= 0), condition TEXT NOT NULL, "availableFrom" TEXT NOT NULL, "availableUntil" TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'available' CHECK(status IN ('available','reserved','sold')), illustration TEXT NOT NULL, color TEXT NOT NULL DEFAULT '#e7ede8', "imageData" TEXT, "imageMime" TEXT, CHECK("availableFrom" <= "availableUntil"))`,
       `CREATE TABLE IF NOT EXISTS conversations (id INTEGER PRIMARY KEY AUTOINCREMENT, "listingId" INTEGER NOT NULL REFERENCES listings(id), "buyerId" INTEGER NOT NULL REFERENCES users(id), UNIQUE("listingId", "buyerId"))`,
       `CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, "conversationId" INTEGER NOT NULL REFERENCES conversations(id), "senderId" INTEGER NOT NULL REFERENCES users(id), text TEXT NOT NULL, "createdAt" TEXT NOT NULL)`,
@@ -124,9 +114,9 @@ async function turso() {
       }
       try { await client.execute(`ALTER TABLE users ADD COLUMN "emailVerifiedAt" TEXT DEFAULT 'legacy'`); }
       catch (error) { if (!String(error).toLowerCase().includes("duplicate column name")) throw error; }
-      try { await client.execute(`ALTER TABLE users ADD COLUMN "googleSub" TEXT`); }
+      try { await client.execute(`ALTER TABLE users ADD COLUMN "firebaseUid" TEXT`); }
       catch (error) { if (!String(error).toLowerCase().includes("duplicate column name")) throw error; }
-      await client.execute(`CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users("googleSub")`);
+      await client.execute(`CREATE UNIQUE INDEX IF NOT EXISTS users_firebase_uid ON users("firebaseUid")`);
       return client;
     } catch (error) { client.close(); throw error; }
   })().catch(error => { tursoConnection = undefined; throw error; });
@@ -137,12 +127,10 @@ async function initPostgres() {
   if (!initialized) initialized = (async () => {
     const sql = postgres();
     const schema = [
-      `CREATE TABLE IF NOT EXISTS users (id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, "passwordHash" TEXT NOT NULL, university TEXT NOT NULL, "emailVerifiedAt" TEXT DEFAULT 'legacy', "googleSub" TEXT UNIQUE)`,
-      `CREATE TABLE IF NOT EXISTS email_verifications ("userId" INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, "tokenHash" TEXT NOT NULL UNIQUE, "expiresAt" BIGINT NOT NULL)`,
+      `CREATE TABLE IF NOT EXISTS users (id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, "passwordHash" TEXT NOT NULL, university TEXT NOT NULL, "emailVerifiedAt" TEXT DEFAULT 'legacy', "firebaseUid" TEXT UNIQUE)`,
       `ALTER TABLE users ADD COLUMN IF NOT EXISTS "emailVerifiedAt" TEXT DEFAULT 'legacy'`,
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS "googleSub" TEXT`,
-      `CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users("googleSub")`,
-      `CREATE TABLE IF NOT EXISTS sessions ("tokenHash" TEXT PRIMARY KEY, "userId" INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "expiresAt" BIGINT NOT NULL)`,
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS "firebaseUid" TEXT`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS users_firebase_uid ON users("firebaseUid")`,
       `CREATE TABLE IF NOT EXISTS listings (id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, "sellerId" INTEGER NOT NULL REFERENCES users(id), title TEXT NOT NULL, description TEXT NOT NULL, university TEXT NOT NULL, category TEXT NOT NULL, "priceCents" INTEGER NOT NULL CHECK("priceCents" >= 0), condition TEXT NOT NULL, "availableFrom" TEXT NOT NULL, "availableUntil" TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'available' CHECK(status IN ('available','reserved','sold')), illustration TEXT NOT NULL, color TEXT NOT NULL DEFAULT '#e7ede8', "imageData" TEXT, "imageMime" TEXT, CHECK("availableFrom" <= "availableUntil"))`,
       `CREATE TABLE IF NOT EXISTS conversations (id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, "listingId" INTEGER NOT NULL REFERENCES listings(id), "buyerId" INTEGER NOT NULL REFERENCES users(id), UNIQUE("listingId", "buyerId"))`,
       `CREATE TABLE IF NOT EXISTS messages (id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, "conversationId" INTEGER NOT NULL REFERENCES conversations(id), "senderId" INTEGER NOT NULL REFERENCES users(id), text TEXT NOT NULL, "createdAt" TEXT NOT NULL)`,

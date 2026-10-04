@@ -1,66 +1,62 @@
-import { randomBytes, createHash, scrypt, timingSafeEqual } from "node:crypto";
-import type { NextRequest, NextResponse } from "next/server";
+import { scrypt, timingSafeEqual } from "node:crypto";
+import type { NextRequest } from "next/server";
+import type { DecodedIdToken } from "firebase-admin/auth";
 import type { User } from "../contracts";
 import { row, rows } from "./db";
+import { adminAuth } from "./firebase-admin";
 import { HttpError } from "./validation";
 
-const COOKIE = "handoff_session";
-const TTL = 60 * 60 * 24 * 7;
-const digest = (value: string) => createHash("sha256").update(value).digest("hex");
+const tokenCache = new WeakMap<NextRequest, Promise<DecodedIdToken | null>>();
 
-export async function passwordHash(password: string, salt = randomBytes(16).toString("hex")) {
-  const key = await new Promise<Buffer>((resolve, reject) => {
-    scrypt(password, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }, (error, derived) => {
-      if (error) reject(error); else resolve(derived);
-    });
-  });
-  return `${salt}:${key.toString("hex")}`;
-}
-
-export async function verifyPassword(password: string, hash: string) {
-  const [salt, expected] = hash.split(":");
-  const actual = (await passwordHash(password, salt)).split(":")[1];
-  return timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(expected, "hex"));
+export async function verifiedToken(request: NextRequest) {
+  let pending = tokenCache.get(request);
+  if (!pending) {
+    pending = (async () => {
+      const authorization = request.headers.get("authorization");
+      if (!authorization) return null;
+      const match = /^Bearer ([A-Za-z0-9_.-]{20,8192})$/.exec(authorization);
+      if (!match) throw new HttpError(401, "Sign in again to continue.");
+      try { return await adminAuth().verifyIdToken(match[1], true); }
+      catch (error) {
+        if (error instanceof HttpError) throw error;
+        throw new HttpError(401, "Your sign-in expired. Sign in again to continue.");
+      }
+    })();
+    tokenCache.set(request, pending);
+  }
+  return pending;
 }
 
 export async function currentUser(request: NextRequest): Promise<User | null> {
-  const token = request.cookies.get(COOKIE)?.value;
-  if (!token) return null;
-  const account = await row<Pick<User, "id" | "name" | "email" | "university"> & { emailVerifiedAt: string | null }>(`SELECT u.id,u.name,u.email,u.university,u."emailVerifiedAt" FROM sessions s JOIN users u ON u.id=s."userId"
-    WHERE s."tokenHash"=$1 AND s."expiresAt">$2`, digest(token), Date.now());
-  return account ? { id: account.id, name: account.name, email: account.email, university: account.university,
-    emailVerified: Boolean(account.emailVerifiedAt && account.emailVerifiedAt !== "legacy"),
-    emailVerificationRequired: !account.emailVerifiedAt || account.emailVerifiedAt === "legacy" } : null;
+  const identity = await verifiedToken(request);
+  if (!identity) return null;
+  const account = await row<Pick<User, "id" | "name" | "email" | "university">>(
+    `SELECT id,name,email,university FROM users WHERE "firebaseUid"=$1`, identity.uid);
+  if (!account) return null;
+  const emailVerified = identity.email_verified === true;
+  return { ...account, emailVerified, emailVerificationRequired: !emailVerified };
 }
 
 export async function requireUser(request: NextRequest) {
+  if (!await verifiedToken(request)) throw new HttpError(401, "Sign in to continue.");
   const user = await currentUser(request);
-  if (!user) throw new HttpError(401, "Sign in to continue.");
+  if (!user) throw new HttpError(403, "Complete your Handoff profile before continuing.");
   return user;
 }
 
 export async function requireVerifiedUser(request: NextRequest) {
   const user = await requireUser(request);
-  if (!user.emailVerified) throw new HttpError(403, "Verify your email address before using this feature.");
+  if (!user.emailVerified) throw new HttpError(403, "Verify your Firebase email address before using this feature.");
   return user;
 }
 
-export async function endSession(request: NextRequest, response: NextResponse) {
-  const old = request.cookies.get(COOKIE)?.value;
-  if (old) await rows("DELETE FROM sessions WHERE \"tokenHash\"=$1", digest(old));
-  response.cookies.set(COOKIE, "", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 0, secure: secureCookie(request) });
-}
-
-function secureCookie(request: NextRequest) {
-  return process.env.APP_ORIGIN ? new URL(process.env.APP_ORIGIN).protocol === "https:" : request.nextUrl.protocol === "https:";
-}
-
-export async function startSession(request: NextRequest, response: NextResponse, userId: number) {
-  await endSession(request, response);
-  const token = randomBytes(32).toString("hex");
-  await rows("DELETE FROM sessions WHERE \"expiresAt\"<=$1", Date.now());
-  await rows("INSERT INTO sessions(\"tokenHash\",\"userId\",\"expiresAt\") VALUES($1,$2,$3)", digest(token), userId, Date.now() + TTL * 1000);
-  response.cookies.set(COOKIE, token, { httpOnly: true, sameSite: "lax", path: "/", maxAge: TTL, secure: secureCookie(request) });
+// Used only to prove ownership of an existing Handoff profile during migration.
+export async function verifyLegacyPassword(password: string, hash: string) {
+  const [salt, expected] = hash.split(":");
+  if (!/^[a-f0-9]{32}$/.test(salt ?? "") || !/^[a-f0-9]{128}$/.test(expected ?? "")) return false;
+  const actual = await new Promise<Buffer>((resolve, reject) => scrypt(password, salt, 64,
+    { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }, (error, derived) => error ? reject(error) : resolve(derived)));
+  return timingSafeEqual(actual, Buffer.from(expected, "hex"));
 }
 
 export async function limit(key: string, max: number, windowMs = 15 * 60 * 1000) {
