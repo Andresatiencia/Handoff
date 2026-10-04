@@ -1,8 +1,26 @@
+import Image from "next/image";
 import { ListingActions } from "./listing-actions";
-import { formatDate, type Listing } from "@/lib/listings";
+import { formatDate, formatPrice, type Listing } from "@/lib/listings";
 import { CalendarIcon } from "./icons";
 import { ItemArt } from "./item-art";
-import Image from "next/image";
+
 export function ListingCard({ listing, onChange }: { listing: Listing; onChange?: () => void }) {
-  return <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md"><div className="relative" style={{ backgroundColor: listing.color }}>{listing.hasImage ? <Image unoptimized src={`/api/listings/${listing.id}/image`} alt={listing.title} width={600} height={420} className="h-49 w-full object-cover transition duration-300 group-hover:scale-105" /> : <ItemArt kind={listing.illustration} className="h-49 w-full transition duration-300 group-hover:scale-105"/>}<span className={`absolute left-4 top-4 rounded-full px-2.5 py-1 text-[11px] font-semibold ${listing.status === "available" ? "bg-white/90 text-forest" : "bg-[#fff1d5] text-[#79571e]"}`}><span aria-hidden="true">{listing.status === "available" ? "● " : "◷ "}</span>{listing.status === "available" ? "Available" : listing.status === "sold" ? "Sold" : "Reserved"}</span></div><div className="flex flex-1 flex-col p-5"><div className="mb-3 flex items-start justify-between gap-2"><h3 className="min-w-0 break-words font-semibold tracking-tight">{listing.title}</h3><span className="font-bold text-forest">{listing.price === 0 ? "FREE" : `$${listing.price}`}</span></div><div className="mb-5 flex items-center gap-2 text-xs"><span className="rounded-md bg-sand px-2 py-1 text-forest">{listing.category}</span><span className="text-muted">{listing.condition}</span></div>{listing.description && <p className="mb-3 line-clamp-2 break-words text-sm text-muted">{listing.description}</p>}{listing.sellerName && <p className="mb-3 break-words text-xs text-muted">Passed on by {listing.sellerName}</p>}<p className="mt-auto flex items-center gap-2 border-t border-ink/8 pt-3 text-xs text-muted"><CalendarIcon />{formatDate(listing.availableFrom)} – {formatDate(listing.availableUntil)}</p><ListingActions listing={listing} onChange={onChange} /></div></article>;
+  return <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-ink/10 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md">
+    <div className="relative" style={{ backgroundColor: listing.color }}>
+      {listing.hasImage
+        ? <Image unoptimized src={`/api/listings/${listing.id}/image`} alt={listing.title} width={600} height={420} className="h-49 w-full object-cover transition duration-300 group-hover:scale-105" />
+        : <ItemArt kind={listing.illustration} className="h-49 w-full transition duration-300 group-hover:scale-105" />}
+      <span className={`absolute left-4 top-4 rounded-full px-2.5 py-1 text-[11px] font-semibold ${listing.status === "available" ? "bg-white/90 text-forest" : "bg-[#fff1d5] text-[#79571e]"}`}>
+        <span aria-hidden="true">{listing.status === "available" ? "● " : "◷ "}</span>{listing.status === "available" ? "Available" : listing.status === "sold" ? "Sold" : "Reserved"}
+      </span>
+    </div>
+    <div className="flex flex-1 flex-col p-5">
+      <div className="mb-3 flex items-start justify-between gap-2"><h3 className="min-w-0 break-words font-semibold tracking-tight">{listing.title}</h3><span className="font-bold text-forest">{formatPrice(listing.price)}</span></div>
+      <div className="mb-5 flex items-center gap-2 text-xs"><span className="rounded-md bg-sand px-2 py-1 text-forest">{listing.category}</span><span className="text-muted">{listing.condition}</span></div>
+      {listing.description && <p className="mb-3 line-clamp-2 break-words text-sm text-muted">{listing.description}</p>}
+      {listing.sellerName && <p className="mb-3 break-words text-xs text-muted">Passed on by {listing.sellerName}</p>}
+      <p className="mt-auto flex items-center gap-2 border-t border-ink/8 pt-3 text-xs text-muted"><CalendarIcon />{formatDate(listing.availableFrom)} – {formatDate(listing.availableUntil)}</p>
+      <ListingActions listing={listing} onChange={onChange} />
+    </div>
+  </article>;
 }

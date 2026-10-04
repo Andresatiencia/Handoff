@@ -146,3 +146,36 @@ export async function rows<T>(query: string, ...values: Value[]): Promise<T[]> {
 export async function row<T>(query: string, ...values: Value[]): Promise<T | undefined> {
   return (await rows<T>(query, ...values))[0];
 }
+
+export async function deleteListing(id: number, sellerId: number): Promise<boolean> {
+  const statements = [
+    `DELETE FROM messages WHERE "conversationId" IN (
+      SELECT c.id FROM conversations c JOIN listings l ON l.id=c."listingId"
+      WHERE l.id=$1 AND l."sellerId"=$2)`,
+    `DELETE FROM conversations WHERE "listingId" IN (SELECT id FROM listings WHERE id=$1 AND "sellerId"=$2)`,
+    `DELETE FROM listings WHERE id=$1 AND "sellerId"=$2 RETURNING id`,
+  ];
+  if (process.env.DATABASE_URL) {
+    await initPostgres();
+    const sql = postgres();
+    const results = await sql.transaction(statements.map(statement => sql.query(statement, [id, sellerId])));
+    return results[2].length > 0;
+  }
+  const sqliteStatements = statements.map(statement => statement.replace(/\$[12]/g, "?"));
+  if (process.env.TURSO_DATABASE_URL || process.env.TURSO_AUTH_TOKEN) {
+    const results = await (await turso()).batch(sqliteStatements.map(statement => [statement, [id, sellerId]]), "write");
+    return results[2].rows.length > 0;
+  }
+  const connection = sqlite();
+  connection.exec("BEGIN IMMEDIATE");
+  try {
+    connection.prepare(sqliteStatements[0]).run(id, sellerId);
+    connection.prepare(sqliteStatements[1]).run(id, sellerId);
+    const deleted = connection.prepare(sqliteStatements[2]).get(id, sellerId);
+    connection.exec("COMMIT");
+    return Boolean(deleted);
+  } catch (error) {
+    connection.exec("ROLLBACK");
+    throw error;
+  }
+}

@@ -60,7 +60,7 @@ test("real server: accounts, listings, private messages, and restart persistence
     };
   }
   const seller = client(), buyer = client(), stranger = client(), anonymous = client();
-  let sellerId, buyerId, listingId, threadId, secondThreadId;
+  let sellerId, buyerId, listingId, threadId, secondThreadId, imageId;
   const item = { title: "Test desk lamp", description: "Working lamp for a dorm room.", university: campus,
     category: "Bedroom", price: 12.50, condition: "Good", availableFrom: "2026-12-10", availableUntil: "2026-12-17" };
 
@@ -90,7 +90,7 @@ test("real server: accounts, listings, private messages, and restart persistence
 
   await t.test("posting validates server-side data and derives ownership from the session", async () => {
     assert.equal((await anonymous("listings", "POST", item)).status, 401);
-    for (const invalid of [{ university: "Other" }, { price: -1 }, { price: 1.234 }, { price: "12" }, { availableFrom: "2026-02-30" }, { availableUntil: "2026-12-01" }, { category: "Invalid" }, { title: "   " }, { departure: "2026-12-15" }]) {
+    for (const invalid of [{ university: "Other" }, { price: -1 }, { price: 1.234 }, { price: 12.345 }, { price: "12" }, { availableFrom: "2026-02-30" }, { availableUntil: "2026-12-01" }, { category: "Invalid" }, { title: "   " }, { departure: "2026-12-15" }]) {
       assert.equal((await seller("listings", "POST", { ...item, ...invalid })).status, 400, JSON.stringify(invalid));
     }
     const created = await seller("listings", "POST", { ...item, sellerId: buyerId, sellerName: "Impersonated" });
@@ -98,6 +98,7 @@ test("real server: accounts, listings, private messages, and restart persistence
     listingId = created.data.listing.id;
     assert.equal(created.data.listing.sellerId, sellerId);
     assert.equal(created.data.listing.sellerName, "Seller");
+    assert.equal(created.data.listing.price, 12.5);
     const persisted = await buyer(`listings/${listingId}`);
     assert.equal(persisted.data.listing.illustration, "lamp");
     assert.equal(persisted.data.listing.color, "#e6ebe4");
@@ -153,10 +154,11 @@ test("real server: accounts, listings, private messages, and restart persistence
     const created = await seller("listings", "POST", { ...item, title: "Photo listing", image: { mime: "image/png", data: png.toString("base64") } });
     assert.equal(created.status, 201);
     assert.equal(created.data.listing.hasImage, 1);
-    const imageId = created.data.listing.id;
+    imageId = created.data.listing.id;
     const image = await fetch(`${origin}/api/listings/${imageId}/image`);
     assert.equal(image.status, 200);
     assert.equal(image.headers.get("content-type"), "image/png");
+    assert.equal(image.headers.get("cache-control"), "no-store");
     assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
     assert.equal((await seller(`listings/${imageId}`, "PATCH", { status: "sold" })).status, 200);
   });
@@ -186,6 +188,25 @@ test("real server: accounts, listings, private messages, and restart persistence
     assert.equal((await seller("auth/me")).data.user.id, sellerId);
     assert.equal((await anonymous(`listings/${listingId}`)).data.listing.title, item.title);
     assert.equal((await buyer(`conversations/${threadId}/messages`)).data.messages.length, 2);
+  });
+
+  await t.test("only the seller can delete a listing and its conversations, messages, and photo", async () => {
+    assert.equal((await anonymous(`listings/${listingId}`, "DELETE")).status, 401);
+    assert.equal((await buyer(`listings/${listingId}`, "DELETE")).status, 403);
+    assert.equal((await seller(`listings/${listingId}`, "DELETE", undefined, { Origin: "https://other.example" })).status, 403);
+    assert.equal((await seller(`listings/${listingId}`, "DELETE")).status, 200);
+    assert.equal((await anonymous(`listings/${listingId}`)).status, 404);
+    assert.equal((await buyer(`conversations/${threadId}/messages`)).status, 404);
+    assert.equal((await seller("conversations")).data.conversations.length, 0);
+    assert.equal((await seller(`listings/${listingId}`, "DELETE")).status, 404);
+    assert.equal((await seller(`listings/${imageId}`, "DELETE")).status, 200);
+    const photo = await fetch(`${origin}/api/listings/${imageId}/image`);
+    assert.equal(photo.status, 404);
+    assert.equal((await anonymous("listings")).data.listings.length, 0);
+    const inspection = new DatabaseSync(database, { readOnly: true });
+    assert.equal(inspection.prepare("SELECT COUNT(*) AS total FROM conversations").get().total, 0);
+    assert.equal(inspection.prepare("SELECT COUNT(*) AS total FROM messages").get().total, 0);
+    inspection.close();
   });
 
   await t.test("repeated failed login attempts are throttled", async () => {

@@ -22,7 +22,7 @@ Create an account at **Sign in → Create account**, then post your first item. 
 3. Browse the marketplace and choose **Message seller**. Send a message.
 4. In the seller's browser, open **Messages** and reply. Messages refresh every three seconds.
 5. Each buyer has a separate private conversation with the seller.
-6. Use **My account → Manage my listings** to mark an item available, reserved, or sold/handed off.
+6. Use **My account → Manage my listings** to mark an item available, reserved, or sold/handed off, or to delete it.
 
 Both browsers must access the **same running Handoff server**. Different localhost ports or separate server databases are separate installations. Other devices can use a reachable server address; internet-wide access requires hosting.
 
@@ -30,7 +30,7 @@ Both browsers must access the **same running Handoff server**. Different localho
 
 - Registration, sign-in, sign-out, seven-day server-side sessions, and account ownership.
 - Salted scrypt password hashes and random session tokens stored as SHA-256 hashes; HttpOnly, SameSite cookies, with Secure cookies when the configured origin uses HTTPS.
-- Persistent shared listings, seller status management, server validation, product photos, and prices stored as integer cents.
+- Persistent shared listings, seller status management and deletion, server validation, product photos, and prices stored as integer cents. The price form accepts at most two decimal places.
 - Public browsing with category, search, status, university, and inclusive arrival-date filters.
 - Only University of Central Missouri is selectable; the API enforces this restriction.
 - Private per-buyer/per-listing conversations, sender identity from the session, and polling for new messages.
@@ -38,7 +38,7 @@ Both browsers must access the **same running Handoff server**. Different localho
 - Same-origin checks on writes, request-size limits, parameterized SQL, and participant/ownership checks.
 - Loading, empty, and error states. Failed writes do not display a success confirmation.
 
-Selecting a university is self-reported affiliation; it does not verify enrollment. Payments, email verification, password recovery, notifications, moderation, and automatic claiming are not implemented. Sellers reserve and close listings manually; pickup arrangements happen in messages. These are follow-up features, not simulated backend behavior.
+Selecting a university is self-reported affiliation; it does not verify enrollment. Payments, email verification, password recovery, notifications, moderation, and automatic claiming are not implemented. Sellers reserve and close listings manually; pickup arrangements happen in messages. Deleting a listing also permanently removes its photo and associated conversations and messages. These are follow-up features, not simulated backend behavior.
 
 ## Configuration and hosting
 
@@ -101,7 +101,7 @@ Routes: `/`, `/account`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/mes
 
 API:
 - `GET /api/auth/me`; `POST /api/auth/register|login|logout`.
-- `GET/POST /api/listings`; `GET/PATCH /api/listings/:id` (PATCH changes status); `GET /api/listings/:id/image`.
+- `GET/POST /api/listings`; `GET/PATCH/DELETE /api/listings/:id` (PATCH changes status; DELETE is seller-only); `GET /api/listings/:id/image`.
 - `GET/POST /api/conversations`.
 - `GET/POST /api/conversations/:id/messages`.
 

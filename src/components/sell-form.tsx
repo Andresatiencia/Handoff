@@ -21,6 +21,7 @@ function ListingForm() {
   const { user } = useAuth();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [price, setPrice] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
   useEffect(() => {
@@ -65,7 +66,7 @@ function ListingForm() {
         <div className="grid gap-5 sm:grid-cols-3">
           <label className="text-sm font-semibold">Category<select name="category" className="form-input mt-2">{categories.map(category => <option key={category}>{category}</option>)}</select></label>
           <label className="text-sm font-semibold">Condition<select name="condition" className="form-input mt-2"><option>Good</option><option>Like new</option><option>Used</option></select></label>
-          <label className="text-sm font-semibold">Price (USD)<input name="price" type="number" min="0" max="100000" step="0.01" required className="form-input mt-2" placeholder="0.00" /></label>
+          <label className="text-sm font-semibold">Price (USD)<input name="price" type="text" inputMode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" value={price} onChange={event => { const next = event.target.value.replace(",", "."); if (/^[0-9]*([.][0-9]{0,2})?$/.test(next)) setPrice(next); }} required className="form-input mt-2" placeholder="0.00" /><span className="mt-1 block text-xs font-normal text-muted">Use up to 2 decimal places.</span></label>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="text-sm font-semibold">Available from<input name="availableFrom" type="date" required min="2020-01-01" max="2100-12-31" className="form-input mt-2" /></label>

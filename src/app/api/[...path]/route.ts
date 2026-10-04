@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { row, rows, StorageUnavailable } from "@/lib/server/db";
+import { deleteListing, row, rows, StorageUnavailable } from "@/lib/server/db";
 import { currentUser, requireUser, passwordHash, verifyPassword, startSession, endSession, limit } from "@/lib/server/auth";
 import { HttpError, text, date, university, listingInput } from "@/lib/server/validation";
 import { getListing, listingSelect } from "@/lib/server/listings";
@@ -136,7 +136,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       const image = await row<{ imageData: string | null; imageMime: string | null }>(`SELECT "imageData","imageMime" FROM listings WHERE id=$1`, Number(parts[1]));
       if (!image?.imageData || !image.imageMime) throw new HttpError(404, "Photo not found.");
       return new NextResponse(Buffer.from(image.imageData, "base64"), {
-        headers: { "Content-Type": image.imageMime, "Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff" },
+        headers: { "Content-Type": image.imageMime, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
       });
     }
     if (parts[0] === "listings" && parts.length === 2 && /^\d+$/.test(parts[1])) {
@@ -144,6 +144,12 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       const listing = await getListing(id);
       if (!listing) throw new HttpError(404, "Item not found.");
       if (method === "GET") return json({ listing });
+      if (method === "DELETE") {
+        const user = await requireUser(request);
+        if (listing.sellerId !== user.id) throw new HttpError(403, "Only the seller can delete this listing.");
+        if (!await deleteListing(id, user.id)) throw new HttpError(404, "Item not found.");
+        return json({ ok: true });
+      }
       if (method === "PATCH") {
         const user = await requireUser(request);
         if (listing.sellerId !== user.id) throw new HttpError(403, "Only the seller can change this listing.");
@@ -195,4 +201,4 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
   }
 }
 
-export { handle as GET, handle as POST, handle as PATCH };
+export { handle as GET, handle as POST, handle as PATCH, handle as DELETE };

@@ -9,7 +9,7 @@ import { ListingCard } from "./listing-card";
 // Fetched from the client so the landing page stays static and keeps rendering
 // on hosts where the database is unavailable.
 export function RecentListings() {
-  const { data, loading, error } = useRemote<{ listings: Listing[] }>(
+  const { data, loading, error, refresh } = useRemote<{ listings: Listing[] }>(
     `listings?available=true&university=${encodeURIComponent(UNIVERSITY)}`,
   );
   if (loading) return <p className="py-6 text-sm text-muted" role="status">Loading the latest items…</p>;
@@ -21,6 +21,6 @@ export function RecentListings() {
     </p>;
   }
   return <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-    {listings.map(listing => <ListingCard key={listing.id} listing={listing} />)}
+    {listings.map(listing => <ListingCard key={listing.id} listing={listing} onChange={refresh} />)}
   </div>;
 }
