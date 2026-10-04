@@ -1,0 +1,305 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-04T12:59:24.779Z",
+  "title": "Design System: Handoff",
+  "extensions": {
+    "colorMeta": {
+      "terracotta": {
+        "role": "primary",
+        "displayName": "Handoff terracotta",
+        "tonalRamp": [
+          "oklch(15% 0.13 30)",
+          "oklch(26% 0.13 30)",
+          "oklch(37% 0.13 30)",
+          "oklch(48% 0.13 30)",
+          "oklch(59% 0.13 30)",
+          "oklch(70% 0.13 30)",
+          "oklch(82% 0.13 30)",
+          "oklch(95% 0.13 30)"
+        ]
+      },
+      "terracotta-hover": {
+        "role": "primary",
+        "displayName": "Deep terracotta",
+        "tonalRamp": [
+          "oklch(15% 0.12 30)",
+          "oklch(26% 0.12 30)",
+          "oklch(37% 0.12 30)",
+          "oklch(48% 0.12 30)",
+          "oklch(59% 0.12 30)",
+          "oklch(70% 0.12 30)",
+          "oklch(82% 0.12 30)",
+          "oklch(95% 0.12 30)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Warm ink",
+        "tonalRamp": [
+          "oklch(15% 0.02 45)",
+          "oklch(26% 0.02 45)",
+          "oklch(37% 0.02 45)",
+          "oklch(48% 0.02 45)",
+          "oklch(59% 0.02 45)",
+          "oklch(70% 0.02 45)",
+          "oklch(82% 0.02 45)",
+          "oklch(95% 0.02 45)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Quiet brown",
+        "tonalRamp": [
+          "oklch(15% 0.025 55)",
+          "oklch(26% 0.025 55)",
+          "oklch(37% 0.025 55)",
+          "oklch(48% 0.025 55)",
+          "oklch(59% 0.025 55)",
+          "oklch(70% 0.025 55)",
+          "oklch(82% 0.025 55)",
+          "oklch(95% 0.025 55)"
+        ]
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Pickup amber",
+        "tonalRamp": [
+          "oklch(15% 0.09 70)",
+          "oklch(26% 0.09 70)",
+          "oklch(37% 0.09 70)",
+          "oklch(48% 0.09 70)",
+          "oklch(59% 0.09 70)",
+          "oklch(70% 0.09 70)",
+          "oklch(82% 0.09 70)",
+          "oklch(95% 0.09 70)"
+        ]
+      },
+      "ivory": {
+        "role": "neutral",
+        "displayName": "Ivory paper",
+        "tonalRamp": [
+          "oklch(15% 0.01 90)",
+          "oklch(26% 0.01 90)",
+          "oklch(37% 0.01 90)",
+          "oklch(48% 0.01 90)",
+          "oklch(59% 0.01 90)",
+          "oklch(70% 0.01 90)",
+          "oklch(82% 0.01 90)",
+          "oklch(95% 0.01 90)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Light paper",
+        "tonalRamp": [
+          "oklch(15% 0.008 90)",
+          "oklch(26% 0.008 90)",
+          "oklch(37% 0.008 90)",
+          "oklch(48% 0.008 90)",
+          "oklch(59% 0.008 90)",
+          "oklch(70% 0.008 90)",
+          "oklch(82% 0.008 90)",
+          "oklch(95% 0.008 90)"
+        ]
+      },
+      "sand": {
+        "role": "neutral",
+        "displayName": "Soft sand",
+        "tonalRamp": [
+          "oklch(15% 0.015 75)",
+          "oklch(26% 0.015 75)",
+          "oklch(37% 0.015 75)",
+          "oklch(48% 0.015 75)",
+          "oklch(59% 0.015 75)",
+          "oklch(70% 0.015 75)",
+          "oklch(82% 0.015 75)",
+          "oklch(95% 0.015 75)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White contrast",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(48% 0 0)",
+          "oklch(59% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(82% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Ink line",
+        "tonalRamp": [
+          "oklch(15% 0.02 45)",
+          "oklch(26% 0.02 45)",
+          "oklch(37% 0.02 45)",
+          "oklch(48% 0.02 45)",
+          "oklch(59% 0.02 45)",
+          "oklch(70% 0.02 45)",
+          "oklch(82% 0.02 45)",
+          "oklch(95% 0.02 45)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Home hero statement."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page introductions."
+      },
+      "section": {
+        "displayName": "Section",
+        "purpose": "Major content groups."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Descriptions and form help."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, labels, and navigation."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "Handoff brand name only."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "ease-handoff",
+        "value": "cubic-bezier(.23,1,.32,1)",
+        "purpose": "Object movement and message entry."
+      },
+      {
+        "name": "control-transition",
+        "value": "150ms ease-out",
+        "purpose": "Control color changes."
+      },
+      {
+        "name": "object-transition",
+        "value": "850ms cubic-bezier(.23,1,.32,1)",
+        "purpose": "One leaving/arriving object rearrangement; disabled for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "760px"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1050px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Terracotta action for posting, finding, confirming, or reserving.",
+      "html": "<button class=\"ds-button-primary\">Find items</button>",
+      "css": ".ds-button-primary{min-height:48px;padding:13px 21px;border:1px solid transparent;border-radius:6px;background:#a54433;color:#fff;font:600 14px \"DM Sans\",sans-serif;cursor:pointer;transition:background-color 150ms ease-out,transform 150ms cubic-bezier(.23,1,.32,1)}.ds-button-primary:hover{background:#863725}.ds-button-primary:focus-visible{outline:3px solid #a54433;outline-offset:4px}.ds-button-primary:active{transform:scale(.98)}.ds-button-primary:disabled{opacity:.55;cursor:not-allowed}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Quiet bordered action beside a primary decision.",
+      "html": "<button class=\"ds-button-secondary\">Set arrival details</button>",
+      "css": ".ds-button-secondary{min-height:48px;padding:13px 21px;border:1px solid #342d2840;border-radius:6px;background:transparent;color:#342d28;font:600 14px \"DM Sans\",sans-serif;cursor:pointer;transition:background-color 150ms ease-out,transform 150ms cubic-bezier(.23,1,.32,1)}.ds-button-secondary:hover{background:#eee7dc}.ds-button-secondary:focus-visible{outline:3px solid #a54433;outline-offset:4px}.ds-button-secondary:active{transform:scale(.98)}"
+    },
+    {
+      "name": "Text field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Light-paper field used across student and account forms.",
+      "html": "<label class=\"ds-field-label\">Find an essential<input class=\"ds-input\" type=\"search\" placeholder=\"Search for a fridge, coat, lamp…\"></label>",
+      "css": ".ds-field-label{display:block;color:#342d28;font:600 14px \"DM Sans\",sans-serif}.ds-input{display:block;width:100%;min-height:48px;margin-top:8px;padding:12px 14px;border:1px solid #342d283b;border-radius:6px;background:#fffcf7;color:#342d28;font:400 16px \"DM Sans\",sans-serif;box-sizing:border-box}.ds-input::placeholder{color:#786a60}.ds-input:focus{border-color:#a54433}.ds-input:focus-visible{outline:3px solid #a54433;outline-offset:4px}"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "description": "Quiet text links with terracotta current-page emphasis.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main navigation\"><a href=\"#\">Marketplace</a><a href=\"#\" aria-current=\"page\">Arriving</a><a href=\"#\">Leaving</a></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:26px;font:400 13px \"DM Sans\",sans-serif}.ds-nav a{display:inline-flex;align-items:center;min-height:44px;color:#706356;text-decoration:none}.ds-nav a:hover,.ds-nav a[aria-current=page]{color:#a54433}.ds-nav a[aria-current=page]{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px}.ds-nav a:focus-visible{outline:3px solid #a54433;outline-offset:4px}"
+    },
+    {
+      "name": "Status pill",
+      "kind": "chip",
+      "description": "Small content status on a listing or bundle.",
+      "html": "<span class=\"ds-status\">Available</span>",
+      "css": ".ds-status{display:inline-block;padding:6px 10px;border-radius:999px;background:#fffcf7;color:#342d28;font:400 11px \"DM Sans\",sans-serif}"
+    },
+    {
+      "name": "Listing card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Real listing facts with a labeled fallback when no photo was supplied.",
+      "html": "<article class=\"ds-listing\"><div class=\"ds-listing-empty\"><span>Handoff</span><strong>Kitchen</strong><small>Photo not added</small></div><div class=\"ds-listing-body\"><div class=\"ds-listing-heading\"><strong>Essential item</strong><b>$35.00</b></div><p>Good condition</p><div class=\"ds-listing-window\"><small>Pickup window</small><span>Dec 10 – Dec 17</span></div></div></article>",
+      "css": ".ds-listing{width:280px;overflow:hidden;border:1px solid #342d2826;border-radius:12px;background:#fffcf7;color:#342d28;font-family:\"DM Sans\",sans-serif}.ds-listing-empty{height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#e9dfd2;text-align:center}.ds-listing-empty span{color:#a54433;font:800 15px Manrope,sans-serif}.ds-listing-empty strong{font:400 32px Instrument,Georgia,serif}.ds-listing-empty small,.ds-listing-body p,.ds-listing-window small{color:#706356;font-size:11px}.ds-listing-body{padding:22px}.ds-listing-heading{display:flex;justify-content:space-between;gap:12px}.ds-listing-heading strong{font-size:16px}.ds-listing-heading b{color:#a54433;font-size:21px;white-space:nowrap}.ds-listing-window{display:flex;flex-direction:column;padding-top:14px;border-top:1px solid #342d2826;font-size:12px}"
+    },
+    {
+      "name": "Perspective switch",
+      "kind": "custom",
+      "refersTo": "intent-selected",
+      "description": "Explicit leaving/arriving state on the home illustration.",
+      "html": "<div class=\"ds-switch\" role=\"group\" aria-label=\"Student perspective\"><button aria-pressed=\"false\">I’m leaving</button><button aria-pressed=\"true\">I’m arriving</button></div>",
+      "css": ".ds-switch{display:inline-flex;padding:4px;border:1px solid #342d2826;border-radius:999px;background:#fffcf7}.ds-switch button{min-height:44px;padding:11px 23px;border:0;border-radius:999px;background:transparent;color:#706356;font:400 13px \"DM Sans\",sans-serif;cursor:pointer;transition:background-color 150ms ease-out,color 150ms ease-out}.ds-switch button[aria-pressed=true]{background:#a54433;color:#fff}.ds-switch button:focus-visible{outline:3px solid #a54433;outline-offset:4px}"
+    },
+    {
+      "name": "Bundle card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Bundle summary with visible demo status, timing, needs coverage, and price.",
+      "html": "<article class=\"ds-bundle\"><span class=\"ds-bundle-tag\">Demo bundle · 5 items</span><h3>Move-in essentials</h3><p>Five everyday items for the next semester.</p><div class=\"ds-bundle-facts\"><span><strong>60%</strong> needs match</span><span><strong>Perfect timing</strong> for your arrival</span></div><div class=\"ds-bundle-price\">Bundle price <strong>$45.00</strong></div></article>",
+      "css": ".ds-bundle{width:280px;box-sizing:border-box;padding:24px;border:1px solid #342d2826;border-radius:12px;background:#fffcf7;color:#342d28;font-family:\"DM Sans\",sans-serif}.ds-bundle-tag{display:inline-block;padding:6px 10px;border-radius:999px;background:#eee7dc;color:#a54433;font-size:11px;font-weight:600}.ds-bundle h3{margin:20px 0 8px;font:400 25px Instrument,Georgia,serif}.ds-bundle p{margin:0;color:#706356;font-size:13px;line-height:1.7}.ds-bundle-facts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px;padding-top:16px;border-top:1px solid #342d2826;color:#706356;font-size:11px}.ds-bundle-facts strong{display:block;color:#a54433;font-size:17px}.ds-bundle-price{margin-top:16px;font-size:11px;color:#706356}.ds-bundle-price strong{display:block;color:#342d28;font-size:26px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Semester Handoff",
+    "overview": "Handoff looks like good essentials moving from one student's last chapter into another student's first. Warm paper tones, dark ink, and a restrained terracotta accent give the product an inviting campus character. Photographic cutout objects make that transfer tangible in editorial moments; real listings keep their own uploaded photos and practical facts in view.\n\nTask screens are calm and direct. Strong serif headlines introduce the moment, while sans-serif labels, dates, prices, and controls carry the work. The leaving/arriving scene changes perspective with an explicit toggle; the interface remains understandable through text when motion is reduced.",
+    "keyCharacteristics": [
+      "Warm, tactile ivory surfaces with a single strong terracotta action color.",
+      "Editorial serif headlines paired with compact, readable task typography.",
+      "Illustrative cutout essentials in brand moments; clear photo provenance in marketplace cards.",
+      "Dates, condition, price, and next action visible where decisions happen."
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Give terracotta to decisions and selected states; let type, spacing, and real item content carry the rest of the hierarchy.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Voice Rule",
+        "body": "Use the serif for meaning and the sans for actions and data; never set a long form or marketplace facts in the display face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Paper Surface Rule",
+        "body": "Separate a card from the ivory canvas with light paper and a fine ink border, not a floating shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use real listing photos when supplied, with the neutral labeled fallback when absent.",
+      "Do keep arrival, departure, and pickup windows visible in marketplace and bundle decisions.",
+      "Do distinguish illustrative objects and labeled demo bundles from real offers.",
+      "Do keep the mobile task layout, focus outline, and reduced-motion behavior intact."
+    ],
+    "donts": [
+      "Don't present brand photography or demo content as a real student's available listing.",
+      "Don't add decorative gradients, glass surfaces, or repeated floating shadows.",
+      "Don't make every card animate or require motion to understand a state change."
+    ]
+  }
+}

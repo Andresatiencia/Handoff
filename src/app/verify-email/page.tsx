@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { VerifyEmail } from "@/components/verify-email";
+import { PageLoading } from "@/components/page-loading";
 
 export default function VerifyEmailPage() {
-  return <Suspense fallback={<main className="page-width py-16">Loading verification…</main>}><VerifyEmail /></Suspense>;
+  return <Suspense fallback={<PageLoading label="Loading verification…" />}><VerifyEmail /></Suspense>;
 }

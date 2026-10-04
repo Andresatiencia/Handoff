@@ -13,10 +13,10 @@ export function RecentListings() {
     `listings?available=true&university=${encodeURIComponent(UNIVERSITY)}`,
   );
   if (loading) return <p className="py-6 text-sm text-muted" role="status">Loading the latest items…</p>;
-  if (error || !data) return null;
+  if (error || !data) return <div role="alert">{error || "Could not load the latest items."} <button type="button" className="underline" onClick={refresh}>Try again</button></div>;
   const listings = data.listings.slice(0, 3);
   if (!listings.length) {
-    return <p className="rounded-2xl border border-dashed border-forest/20 p-8 text-center text-sm text-muted">
+    return <p className="empty-state text-sm text-muted">
       Nothing here yet. <Link href="/sell" className="font-semibold text-forest underline">Post the first item</Link> and start someone else&apos;s next chapter.
     </p>;
   }

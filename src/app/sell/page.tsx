@@ -1,6 +1,7 @@
+import { PageLoading } from "@/components/page-loading";
 import { Suspense } from "react";
 import { SellForm } from "@/components/sell-form";
 
 export default function SellPage() {
-  return <Suspense fallback={<main className="page-width py-16">Loading listing form…</main>}><SellForm /></Suspense>;
+  return <Suspense fallback={<PageLoading label="Loading listing form…" />}><SellForm /></Suspense>;
 }

@@ -7,6 +7,7 @@ import type { Category } from "@/lib/listings";
 import { CategorySelector } from "./category-selector";
 import { DateInput } from "./date-input";
 import { UniversitySelect } from "./university-select";
+import { FlowIntro } from "./flow-intro";
 
 export function StudentForm({ mode }: { mode: "leaving" | "arriving" }) {
   const arriving = mode === "arriving";
@@ -26,12 +27,11 @@ export function StudentForm({ mode }: { mode: "leaving" | "arriving" }) {
     router.push(`/marketplace?${params}`);
   }
 
-  return <main className="page-width py-10 sm:py-16">
+  return <main className="page-width task-page py-10 sm:py-16">
     <Link href="/" className="nav-link">← Back to home</Link>
-    <div className="mx-auto mt-8 max-w-xl">
-      <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">{arriving ? "Make yourself at home." : "Good things deserve a handoff."}</h1>
-      <p className="mt-5 leading-7 text-muted">{arriving ? "Tell us when you're arriving and what you need. Let's get your new chapter off to a good start." : "Moving on? Help another student settle in. Start with your university and the day you're leaving."}</p>
-      <form onSubmit={submit} className="mt-8 space-y-6 rounded-3xl border border-ink/10 bg-white p-6 shadow-sm sm:p-8">
+    <div className="flow-layout">
+      <FlowIntro title={arriving ? "Make yourself at home." : "Good things deserve a handoff."} description={arriving ? "Tell us when you're arriving and what you need. Find essentials and bundles that fit your next chapter." : "Moving on? Help another student settle in. Start with your university and the day you're leaving."} image={arriving ? "chair" : "kitchen"}><div className="flow-progress"><span>Your dates</span><span>{arriving ? "Your essentials" : "Your listing"}</span><span>Your handoff</span></div></FlowIntro>
+      <form onSubmit={submit} className="form-panel space-y-6">
         <DateInput label={arriving ? "When are you arriving?" : "When are you leaving?"} name="date" />
         <UniversitySelect />
         {arriving && <>
