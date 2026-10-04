@@ -68,7 +68,7 @@ function Thread({ id }: { id: string }) {
   if (!data) return <div role="alert" className="rounded-xl bg-white p-8">{error}<button onClick={refresh} className="button-secondary mt-4">Try again</button></div>;
   const other = user?.id === data.conversation.sellerId ? data.conversation.buyerName : data.conversation.sellerName;
   return <section className="min-w-0 overflow-hidden rounded-2xl border border-ink/10 bg-white">
-    <div className="border-b border-ink/10 p-5"><h2 className="break-words text-xl font-semibold">{data.conversation.title}</h2><p className="mt-1 text-sm text-muted">Chatting with {other} · {data.conversation.status}</p></div>
+    <div className="border-b border-ink/10 p-5"><h2 className="break-words text-xl font-semibold">{data.conversation.title}</h2><p className="mt-1 text-sm text-muted">Chatting with {other}<span className="ml-2 rounded-md bg-sand px-2 py-0.5 text-xs font-semibold capitalize text-forest">{data.conversation.status}</span></p></div>
     {error && <p role="alert" className="p-4 text-sm text-red-700">Connection interrupted. {error}</p>}
     <div ref={log} role="log" aria-label="Conversation messages" aria-live="polite" className="h-80 space-y-4 overflow-y-auto p-5">
       {!data.messages.length && <div className="py-14 text-center"><h3 className="font-semibold">Start with a hello.</h3><p className="mt-2 text-sm text-muted">Ask about the item or arrange a pickup date.</p></div>}

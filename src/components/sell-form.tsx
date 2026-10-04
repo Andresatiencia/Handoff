@@ -40,7 +40,7 @@ function ListingForm() {
   return <main className="page-width py-10 sm:py-14">
     <Link href="/marketplace" className="nav-link">← Back to marketplace</Link>
     <div className="mx-auto mt-8 max-w-2xl">
-      <p className="eyebrow">Make room for a new chapter</p>
+      
       <h1 className="mt-3 text-4xl font-semibold tracking-tight">Pass something good along.</h1>
       <p className="mt-4 leading-7 text-muted">Add your item and when it can be picked up. A price of $0 makes it a free handoff.</p>
       <form onSubmit={submit} className="mt-8 space-y-5 rounded-3xl border border-ink/10 bg-white p-6 sm:p-8">

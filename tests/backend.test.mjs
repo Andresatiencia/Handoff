@@ -98,6 +98,9 @@ test("real server: accounts, listings, private messages, and restart persistence
     listingId = created.data.listing.id;
     assert.equal(created.data.listing.sellerId, sellerId);
     assert.equal(created.data.listing.sellerName, "Seller");
+    const persisted = await buyer(`listings/${listingId}`);
+    assert.equal(persisted.data.listing.illustration, "lamp");
+    assert.equal(persisted.data.listing.color, "#e6ebe4");
     assert.equal((await buyer("listings")).data.listings[0].id, listingId);
     assert.equal((await buyer("listings?mine=true")).data.listings.length, 0);
     assert.equal((await seller("listings?mine=true")).data.listings.length, 1);
