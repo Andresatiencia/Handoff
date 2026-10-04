@@ -26,13 +26,21 @@ export async function verifyPassword(password: string, hash: string) {
 export async function currentUser(request: NextRequest): Promise<User | null> {
   const token = request.cookies.get(COOKIE)?.value;
   if (!token) return null;
-  return await row<User>(`SELECT u.id,u.name,u.email,u.university FROM sessions s JOIN users u ON u.id=s."userId"
-    WHERE s."tokenHash"=$1 AND s."expiresAt">$2`, digest(token), Date.now()) ?? null;
+  const account = await row<Pick<User, "id" | "name" | "email" | "university"> & { emailVerifiedAt: string | null }>(`SELECT u.id,u.name,u.email,u.university,u."emailVerifiedAt" FROM sessions s JOIN users u ON u.id=s."userId"
+    WHERE s."tokenHash"=$1 AND s."expiresAt">$2`, digest(token), Date.now());
+  return account ? { id: account.id, name: account.name, email: account.email, university: account.university,
+    emailVerified: Boolean(account.emailVerifiedAt && account.emailVerifiedAt !== "legacy"), emailVerificationRequired: account.emailVerifiedAt === null } : null;
 }
 
 export async function requireUser(request: NextRequest) {
   const user = await currentUser(request);
   if (!user) throw new HttpError(401, "Sign in to continue.");
+  return user;
+}
+
+export async function requireVerifiedUser(request: NextRequest) {
+  const user = await requireUser(request);
+  if (user.emailVerificationRequired) throw new HttpError(403, "Verify your email address before using this feature.");
   return user;
 }
 

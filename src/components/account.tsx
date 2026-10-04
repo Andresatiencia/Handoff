@@ -4,8 +4,10 @@ import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api-client";
+import type { User } from "@/lib/contracts";
 import { useAuth } from "./auth-provider";
 import { UniversitySelect } from "./university-select";
+import { VerifyEmailPrompt } from "./verify-email-prompt";
 
 export function Account() {
   const { user, loading, error: authError, refresh } = useAuth();
@@ -21,8 +23,12 @@ export function Account() {
     event.preventDefault(); setError(""); setBusy(true);
     const fields = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      await api(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify(fields) });
-      refresh(); router.push(next);
+      const result = await api<{ user: User; emailSent?: boolean }>(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify(fields) });
+      refresh();
+      if (result.user.emailVerificationRequired) {
+        if (result.emailSent === false) setError("We could not send the verification email. Use the resend button below to try again.");
+        router.push("/account");
+      } else router.push(next);
     } catch (error) { setError(error instanceof Error ? error.message : "Could not sign in."); }
     finally { setBusy(false); }
   }
@@ -35,9 +41,11 @@ export function Account() {
   }
 
   return <main className="page-width py-16"><div className="mx-auto max-w-lg">
-    
     <h1 className="mt-3 text-4xl font-semibold">{user ? `Hi, ${user.name}.` : register ? "Start your next chapter." : "Welcome back."}</h1>
-    {loading ? <p className="mt-6">Loading account…</p> : user ? <section className="mt-8 space-y-5 rounded-3xl border border-ink/10 bg-white p-8"><p className="break-words">{user.email}</p><p className="text-sm text-muted">{user.university}</p><Link className="button-primary" href="/marketplace?mine=true">Manage my listings</Link><button disabled={busy} onClick={logout} className="button-secondary ml-2">Sign out</button></section> : <form onSubmit={submit} className="mt-8 space-y-5 rounded-3xl border border-ink/10 bg-white p-8">
+    {loading ? <p className="mt-6">Loading account…</p> : user ? <div className="mt-8 space-y-5">
+      {user.emailVerificationRequired && <VerifyEmailPrompt email={user.email} />}
+      <section className="space-y-5 rounded-3xl border border-ink/10 bg-white p-8"><p className="break-words">{user.email}</p><p className="text-sm text-muted">{user.university}</p>{!user.emailVerificationRequired && <Link className="button-primary" href="/marketplace?mine=true">Manage my listings</Link>}<button disabled={busy} onClick={logout} className="button-secondary ml-2">Sign out</button></section>
+    </div> : <form onSubmit={submit} className="mt-8 space-y-5 rounded-3xl border border-ink/10 bg-white p-8">
       {register && <><label className="block text-sm font-semibold">Your name<input name="name" autoComplete="name" required maxLength={60} className="form-input mt-2" /></label><UniversitySelect /></>}
       <label className="block text-sm font-semibold">Email<input type="email" name="email" autoComplete="email" required maxLength={254} className="form-input mt-2" /></label>
       <label className="block text-sm font-semibold">Password<input type="password" name="password" autoComplete={register ? "new-password" : "current-password"} required minLength={12} maxLength={128} className="form-input mt-2" /></label>

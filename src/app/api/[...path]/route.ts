@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteListing, row, rows, StorageUnavailable } from "@/lib/server/db";
-import { currentUser, requireUser, passwordHash, verifyPassword, startSession, endSession, limit } from "@/lib/server/auth";
+import { currentUser, requireUser, requireVerifiedUser, passwordHash, verifyPassword, startSession, endSession, limit } from "@/lib/server/auth";
+import { consumeVerification, issueVerification, verificationEnabled } from "@/lib/server/email-verification";
 import { HttpError, text, date, university, listingInput, priceBound } from "@/lib/server/validation";
 import { getListing, listingSelect } from "@/lib/server/listings";
 import { bundleInput, getBundle, listBundles } from "@/lib/server/bundles";
@@ -74,6 +75,20 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     if (route === "auth/logout" && method === "POST") {
       const response = json({ ok: true }); await endSession(request, response); return response;
     }
+    if (route === "auth/resend-verification" && method === "POST") {
+      const user = await requireUser(request);
+      if (!user.emailVerificationRequired) return json({ sent: false, alreadyVerified: true });
+      if (!verificationEnabled()) throw new HttpError(503, "Email delivery is not configured yet. Please try again later.");
+      await limit(`verify-email:${user.id}`, 3, 3600000);
+      try { await issueVerification(user.id, user.email, process.env.APP_ORIGIN ?? request.nextUrl.origin); }
+      catch { throw new HttpError(503, "We could not send a verification email. Please try again later."); }
+      return json({ sent: true });
+    }
+    if (route === "auth/verify-email" && method === "POST") {
+      const data = await body(request);
+      if (typeof data.token !== "string" || !await consumeVerification(data.token)) throw new HttpError(400, "This verification link is invalid or expired. Request a new one from your account.");
+      return json({ verified: true });
+    }
     if (["auth/register", "auth/login"].includes(route) && method === "POST") {
       // Global cap cannot be bypassed by spoofing proxy headers; per-email cap protects individual accounts.
       await limit("auth:global", 300);
@@ -85,33 +100,40 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
         throw new HttpError(400, "Use a password between 12 and 128 characters.");
       }
       let user: User;
+      let emailSent: boolean | undefined;
       if (route === "auth/register") {
         const name = text(data.name, "Name", 60);
         const campus = university(data.university);
         const hash = await passwordHash(data.password);
         try {
-          const result = await row<{ id: number }>("INSERT INTO users(name,email,\"passwordHash\",university) VALUES($1,$2,$3,$4) RETURNING id", name, email, hash, campus);
-          user = { id: Number(result!.id), name, email, university: campus };
+          const required = verificationEnabled();
+          const result = await row<{ id: number }>("INSERT INTO users(name,email,\"passwordHash\",university,\"emailVerifiedAt\") VALUES($1,$2,$3,$4,$5) RETURNING id", name, email, hash, campus, required ? null : "legacy");
+          user = { id: Number(result!.id), name, email, university: campus, emailVerified: false, emailVerificationRequired: required };
+          if (required) {
+            try { await issueVerification(user.id, email, process.env.APP_ORIGIN ?? request.nextUrl.origin); emailSent = true; }
+            catch { emailSent = false; }
+          }
         } catch (error) {
           if (String(error).toLowerCase().includes("unique") || (error as { code?: string }).code === "23505") throw new HttpError(409, "An account with this email already exists. Sign in instead.");
           throw error;
         }
       } else {
-        const account = await row<User & { passwordHash: string }>("SELECT * FROM users WHERE email=$1", email);
+        const account = await row<User & { passwordHash: string; emailVerifiedAt: string | null }>("SELECT * FROM users WHERE email=$1", email);
         // Perform the same password work for unknown addresses.
         const fallback = `00000000000000000000000000000000:${"00".repeat(64)}`;
         const valid = await verifyPassword(data.password, account?.passwordHash ?? fallback);
         if (!account || !valid) throw new HttpError(401, "Email or password is incorrect.");
-        user = { id: account.id, name: account.name, email: account.email, university: account.university };
+        user = { id: account.id, name: account.name, email: account.email, university: account.university,
+          emailVerified: Boolean(account.emailVerifiedAt && account.emailVerifiedAt !== "legacy"), emailVerificationRequired: account.emailVerifiedAt === null };
       }
-      const response = json({ user }, route === "auth/register" ? 201 : 200);
+      const response = json({ user, emailSent }, route === "auth/register" ? 201 : 200);
       await startSession(request, response, user.id); return response;
     }
     if (route === "bundles" && method === "GET") {
       return json({ bundles: await listBundles((await currentUser(request))?.id ?? null) });
     }
     if (route === "bundles" && method === "POST") {
-      const user = await requireUser(request); await limit(`bundle:${user.id}`, 30, 3600000);
+      const user = await requireVerifiedUser(request); await limit(`bundle:${user.id}`, 30, 3600000);
       const data = bundleInput(await body(request));
       const created = await row<{ id: number }>(`INSERT INTO bundles("sellerId",name,description,"itemsJson","priceCents","retailCents","availableFrom","availableUntil",university)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, user.id, data.name, data.description, JSON.stringify(data.items), data.priceCents, data.retailCents, data.availableFrom, data.availableUntil, data.university);
@@ -123,7 +145,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       return json({ bundle });
     }
     if (parts[0] === "bundles" && parts.length === 3 && parts[2] === "claim" && method === "POST") {
-      const user = await requireUser(request); await limit(`claim:${user.id}`, 60, 3600000);
+      const user = await requireVerifiedUser(request); await limit(`claim:${user.id}`, 60, 3600000);
       const bundle = await getBundle(parts[1], user.id);
       if (!bundle) throw new HttpError(404, "Bundle not found.");
       if (bundle.sellerId === user.id) throw new HttpError(400, "You cannot claim your own bundle.");
@@ -159,7 +181,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       return json({ listings });
     }
     if (route === "listings" && method === "POST") {
-      const user = await requireUser(request); await limit(`post:${user.id}`, 30, 3600000);
+      const user = await requireVerifiedUser(request); await limit(`post:${user.id}`, 30, 3600000);
       const input = await body(request, 1_100_000);
       const data = listingInput(input);
       const image = imageInput(input.image);
@@ -199,7 +221,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       return json({ conversations: await rows(`${conversationSelect} WHERE c."buyerId"=$1 OR l."sellerId"=$2 ORDER BY c.id DESC`, user.id, user.id) });
     }
     if (route === "conversations" && method === "POST") {
-      const user = await requireUser(request); await limit(`conversation:${user.id}`, 60, 3600000);
+      const user = await requireVerifiedUser(request); await limit(`conversation:${user.id}`, 60, 3600000);
       const data = await body(request);
       if (!Number.isSafeInteger(data.listingId)) throw new HttpError(400, "Choose an item.");
       const listing = await getListing(Number(data.listingId));
@@ -220,6 +242,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
           FROM messages m JOIN users u ON u.id=m."senderId" WHERE m."conversationId"=$1 ORDER BY m.id`, thread.id) });
       }
       if (method === "POST") {
+        await requireVerifiedUser(request);
         await limit(`message:${user.id}`, 60, 60000);
         const data = await body(request);
         const content = text(data.text, "Message", 2000);
