@@ -62,7 +62,7 @@ function ListingForm() {
           <label htmlFor="product-photo" className="block text-sm font-semibold">Product photo <span className="font-normal text-muted">(optional)</span></label>
           <input id="product-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => { const chosen = event.target.files?.[0] ?? null; setPhoto(chosen); setPreview(chosen ? URL.createObjectURL(chosen) : ""); }} className="form-input mt-2 file:mr-4 file:rounded-full file:border-0 file:bg-sand file:px-4 file:py-2 file:font-semibold file:text-forest" />
           <p className="mt-2 text-xs text-muted">JPEG, PNG, or WebP, up to 10 MB. We resize it before posting.</p>
-          {preview && <Image unoptimized src={preview} alt="Product photo preview" width={640} height={400} className="mt-4 h-48 w-full rounded-2xl object-cover" />}
+          {preview && <Image unoptimized src={preview} alt="Product photo preview" width={640} height={400} className="mt-4 h-48 w-full rounded-2xl bg-sand object-contain" />}
         </div>
         <div className="grid gap-5 sm:grid-cols-3">
           <label className="text-sm font-semibold">Category<select name="category" className="form-input mt-2">{categories.map(category => <option key={category}>{category}</option>)}</select></label>
