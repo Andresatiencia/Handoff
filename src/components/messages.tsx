@@ -21,11 +21,13 @@ function Inbox() {
   const threadId = params.get("conversation");
   const [openError, setOpenError] = useState("");
   const [opening, setOpening] = useState(false);
-  // The explicit button avoids creating conversations as a side effect of page visits.
-  async function start() {
+  const [firstMessage, setFirstMessage] = useState("");
+  async function start(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (opening || !firstMessage.trim()) return;
     setOpening(true); setOpenError("");
     try {
-      const result = await api<{ conversation: Conversation }>("conversations", { method: "POST", body: JSON.stringify({ listingId: Number(item) }) });
+      const result = await api<{ conversation: Conversation }>("conversations", { method: "POST", body: JSON.stringify({ listingId: Number(item), text: firstMessage }) });
       refresh(); router.replace(`/messages?conversation=${result.conversation.id}`);
     } catch (error) { setOpenError(error instanceof Error ? error.message : "Could not open conversation."); }
     finally { setOpening(false); }
@@ -39,7 +41,7 @@ function Inbox() {
       <aside className="inbox-sidebar"><h2 className="mb-4 font-semibold">Conversations</h2>
         {data?.conversations.length ? <nav aria-label="Conversations" className="space-y-2">{data.conversations.map(thread => <Link href={`/messages?conversation=${thread.id}`} key={thread.id} aria-current={Number(threadId) === thread.id ? "page" : undefined} className={`block rounded-xl p-3 text-sm transition hover:bg-sand ${Number(threadId) === thread.id ? "bg-sand text-forest" : "text-muted"}`}><span className="block break-words font-semibold">{thread.title}</span><span className="mt-1 block text-xs">{user?.id === thread.sellerId ? thread.buyerName : thread.sellerName}</span></Link>)}</nav> : <p className="text-sm leading-6 text-muted">{data ? "Choose Message seller on an item to start a conversation. Buyers who contact you appear here too." : "Loading conversations…"}</p>}
       </aside>
-      {threadId ? <Thread key={`${user?.id}:${threadId}`} id={threadId} /> : <section className="empty-state"><h2 className="text-xl font-semibold">{item ? "Ready to ask about this item?" : "Your next handoff starts here."}</h2><p className="mt-3 text-sm text-muted">Select a conversation or contact a seller from the marketplace.</p>{item ? <button onClick={start} disabled={opening} className="button-primary mt-6">{opening ? "Opening…" : "Start conversation"}</button> : <Link href="/marketplace" className="button-primary mt-6">Browse items</Link>}{openError && <p role="alert" className="mt-4 text-sm text-red-700">{openError}</p>}</section>}
+      {threadId ? <Thread key={`${user?.id}:${threadId}`} id={threadId} /> : <section className="empty-state"><h2 className="text-xl font-semibold">{item ? "Ready to ask about this item?" : "Your next handoff starts here."}</h2><p className="mt-3 text-sm text-muted">{item ? "Send a question to the seller to start the conversation." : "Select a conversation or contact a seller from the marketplace."}</p>{item ? <form onSubmit={start} className="mt-6 text-left"><label htmlFor="first-message" className="text-sm font-semibold">Your message</label><textarea id="first-message" value={firstMessage} onChange={event => setFirstMessage(event.target.value)} disabled={opening} required maxLength={2000} rows={4} className="form-input mt-2 resize-y" placeholder="Hi! Is this still available? I arrive on…" /><div className="mt-3 flex items-center justify-between gap-3"><span className="text-xs text-muted">{firstMessage.length}/2000</span><button type="submit" disabled={opening || !firstMessage.trim()} className="button-primary disabled:cursor-not-allowed disabled:opacity-50">{opening ? "Sending…" : "Send message"}</button></div></form> : <Link href="/marketplace" className="button-primary mt-6">Browse items</Link>}{openError && <p role="alert" className="mt-4 text-sm text-red-700">{openError}</p>}</section>}
     </div>
   </main>;
 }

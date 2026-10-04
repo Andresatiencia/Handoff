@@ -177,6 +177,39 @@ export async function row<T>(query: string, ...values: Value[]): Promise<T | und
   return (await rows<T>(query, ...values))[0];
 }
 
+export async function startConversation(listingId: number, buyerId: number, message: string): Promise<number> {
+  const insertConversation = `INSERT INTO conversations("listingId","buyerId") VALUES($1,$2) ON CONFLICT("listingId","buyerId") DO NOTHING`;
+  const insertMessage = `INSERT INTO messages("conversationId","senderId",text,"createdAt")
+    SELECT id,$2,$3,$4 FROM conversations WHERE "listingId"=$1 AND "buyerId"=$2`;
+  const createdAt = new Date().toISOString();
+  if (process.env.DATABASE_URL) {
+    await initPostgres();
+    const sql = postgres();
+    await sql.transaction([
+      sql.query(insertConversation, [listingId, buyerId]),
+      sql.query(insertMessage, [listingId, buyerId, message, createdAt]),
+    ]);
+  } else if (process.env.TURSO_DATABASE_URL || process.env.TURSO_AUTH_TOKEN) {
+    await (await turso()).batch([
+      [insertConversation.replace(/\$[12]/g, "?"), [listingId, buyerId]],
+      [insertMessage.replace(/\$[1-4]/g, "?"), [buyerId, message, createdAt, listingId, buyerId]],
+    ], "write");
+  } else {
+    const connection = sqlite();
+    connection.exec("BEGIN IMMEDIATE");
+    try {
+      connection.prepare(insertConversation.replace(/\$[12]/g, "?")).run(listingId, buyerId);
+      connection.prepare(insertMessage.replace(/\$[1-4]/g, "?")).run(buyerId, message, createdAt, listingId, buyerId);
+      connection.exec("COMMIT");
+    } catch (error) {
+      connection.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  const conversation = await row<{ id: number }>(`SELECT id FROM conversations WHERE "listingId"=$1 AND "buyerId"=$2`, listingId, buyerId);
+  return Number(conversation!.id);
+}
+
 export async function deleteListing(id: number, sellerId: number): Promise<boolean> {
   const statements = [
     `DELETE FROM messages WHERE "conversationId" IN (

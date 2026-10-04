@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteListing, row, rows, StorageUnavailable } from "@/lib/server/db";
+import { deleteListing, row, rows, startConversation, StorageUnavailable } from "@/lib/server/db";
 import { currentUser, requireUser, passwordHash, verifyPassword, startSession, endSession, limit } from "@/lib/server/auth";
 import { HttpError, text, date, university, listingInput, priceBound } from "@/lib/server/validation";
 import { getListing, listingSelect } from "@/lib/server/listings";
@@ -210,21 +210,27 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     }
     if (route === "conversations" && method === "GET") {
       const user = await requireUser(request);
-      return json({ conversations: await rows(`${conversationSelect} WHERE c."buyerId"=$1 OR l."sellerId"=$2 ORDER BY c.id DESC`, user.id, user.id) });
+      return json({ conversations: await rows(`${conversationSelect} WHERE (c."buyerId"=$1 OR l."sellerId"=$2)
+        AND EXISTS (SELECT 1 FROM messages m WHERE m."conversationId"=c.id) ORDER BY c.id DESC`, user.id, user.id) });
     }
     if (route === "conversations" && method === "POST") {
       const user = await requireUser(request); await limit(`conversation:${user.id}`, 60, 3600000);
       const data = await body(request);
       if (!Number.isSafeInteger(data.listingId)) throw new HttpError(400, "Choose an item.");
+      const content = text(data.text, "Message", 2000);
       const listing = await getListing(Number(data.listingId));
       if (!listing) throw new HttpError(404, "Item not found.");
       if (listing.sellerId === user.id) throw new HttpError(400, "This is your listing. Open Messages to reply to interested buyers.");
       const existing = await row<{ id: number }>(`SELECT id FROM conversations WHERE "listingId"=$1 AND "buyerId"=$2`, listing.id, user.id);
-      if (existing) return json({ conversation: await conversation(existing.id, user.id) });
+      if (existing) {
+        await limit(`message:${user.id}`, 60, 60000);
+        await rows(`INSERT INTO messages("conversationId","senderId",text,"createdAt") VALUES($1,$2,$3,$4)`, existing.id, user.id, content, new Date().toISOString());
+        return json({ conversation: await conversation(existing.id, user.id) });
+      }
       if (listing.status !== "available") throw new HttpError(409, "This item is no longer available. Existing conversations remain open.");
-      await rows(`INSERT INTO conversations("listingId","buyerId") VALUES($1,$2) ON CONFLICT("listingId","buyerId") DO NOTHING`, listing.id, user.id);
-      const created = await row<{ id: number }>(`SELECT id FROM conversations WHERE "listingId"=$1 AND "buyerId"=$2`, listing.id, user.id);
-      return json({ conversation: await conversation(created!.id, user.id) }, 201);
+      await limit(`message:${user.id}`, 60, 60000);
+      const id = await startConversation(listing.id, user.id, content);
+      return json({ conversation: await conversation(id, user.id) }, 201);
     }
     if (parts[0] === "conversations" && /^\d+$/.test(parts[1] ?? "") && parts[2] === "messages" && parts.length === 3) {
       const user = await requireUser(request);

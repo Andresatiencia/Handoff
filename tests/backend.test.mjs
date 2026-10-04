@@ -113,6 +113,7 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     const created = await seller("listings", "POST", { ...item, sellerId: buyerId, sellerName: "Impersonated" });
     assert.equal(created.status, 201);
     listingId = created.data.listing.id;
+    assert.equal((await seller("conversations")).data.conversations.length, 0);
     assert.equal(created.data.listing.sellerId, sellerId);
     assert.equal(created.data.listing.sellerName, "Seller");
     assert.equal(created.data.listing.price, 12.5);
@@ -209,20 +210,22 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
 
   await t.test("different buyers have separate conversations and cannot impersonate a sender", async () => {
     assert.equal((await anonymous("conversations")).status, 401);
-    assert.equal((await seller("conversations", "POST", { listingId })).status, 400);
-    const created = await buyer("conversations", "POST", { listingId });
+    assert.equal((await seller("conversations", "POST", { listingId, text: "Hello" })).status, 400);
+    assert.equal((await buyer("conversations", "POST", { listingId })).status, 400);
+    assert.equal((await buyer("conversations", "POST", { listingId, text: "   " })).status, 400);
+    assert.equal((await seller("conversations")).data.conversations.length, 0);
+    const created = await buyer("conversations", "POST", { listingId, text: "Is it available?" });
     assert.equal(created.status, 201); threadId = created.data.conversation.id;
-    assert.equal((await buyer("conversations", "POST", { listingId })).data.conversation.id, threadId);
-    secondThreadId = (await stranger("conversations", "POST", { listingId })).data.conversation.id;
+    assert.equal((await buyer("conversations", "POST", { listingId, text: "Following up" })).data.conversation.id, threadId);
+    secondThreadId = (await stranger("conversations", "POST", { listingId, text: "Interested too" })).data.conversation.id;
     assert.notEqual(threadId, secondThreadId);
-    assert.equal((await buyer(`conversations/${threadId}/messages`, "POST", { text: "Is it available?", senderId: sellerId })).status, 201);
     const received = await seller(`conversations/${threadId}/messages`);
     assert.equal(received.data.messages[0].senderId, buyerId);
     assert.equal((await seller(`conversations/${threadId}/messages`, "POST", { text: "Yes, let's arrange pickup." })).status, 201);
-    assert.equal((await buyer(`conversations/${threadId}/messages`)).data.messages.length, 2);
+    assert.equal((await buyer(`conversations/${threadId}/messages`)).data.messages.length, 3);
     assert.equal((await stranger(`conversations/${threadId}/messages`)).status, 404);
     assert.equal((await stranger(`conversations/${threadId}/messages`, "POST", { text: "Intrusion" })).status, 404);
-    assert.equal((await stranger(`conversations/${secondThreadId}/messages`)).data.messages.length, 0);
+    assert.equal((await stranger(`conversations/${secondThreadId}/messages`)).data.messages.length, 1);
     assert.equal((await buyer(`conversations/${threadId}/messages`, "POST", { text: "   " })).status, 400);
     assert.equal((await buyer(`conversations/${threadId}/messages`, "POST", { text: "x".repeat(2001) })).status, 400);
     assert.equal((await seller("conversations")).data.conversations.length, 2);
@@ -235,8 +238,13 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.equal((await seller(`listings/${listingId}`, "PATCH", { status: "sold" })).data.listing.status, "sold");
     const fourth = client();
     await fourth("auth/register", "POST", { name: "Late buyer", email: "fourth@example.com", password, university: campus });
-    assert.equal((await fourth("conversations", "POST", { listingId })).status, 409);
-    assert.equal((await buyer("conversations", "POST", { listingId })).data.conversation.id, threadId);
+    assert.equal((await fourth("conversations", "POST", { listingId, text: "Interested" })).status, 409);
+    const inspection = new DatabaseSync(database);
+    const lateBuyerId = inspection.prepare("SELECT id FROM users WHERE email=?").get("fourth@example.com").id;
+    inspection.prepare('INSERT INTO conversations("listingId","buyerId") VALUES(?,?)').run(listingId, lateBuyerId);
+    inspection.close();
+    assert.equal((await seller("conversations")).data.conversations.length, 2, "old empty conversations stay hidden");
+    assert.equal((await buyer("conversations", "POST", { listingId, text: "Can we arrange pickup?" })).data.conversation.id, threadId);
   });
 
   await t.test("uploaded photos are validated, served, and kept with listings", async () => {
@@ -286,7 +294,7 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     await stop(); await start();
     assert.equal((await seller("auth/me")).data.user.id, sellerId);
     assert.equal((await anonymous(`listings/${listingId}`)).data.listing.title, item.title);
-    assert.equal((await buyer(`conversations/${threadId}/messages`)).data.messages.length, 2);
+    assert.equal((await buyer(`conversations/${threadId}/messages`)).data.messages.length, 4);
     assert.equal((await buyer(`bundles/${bundleId}`)).data.bundle.claimedByMe, true);
   });
 
