@@ -54,6 +54,8 @@ npm run build
 npm run start
 ```
 
+The Vercel configuration explicitly selects the Next.js framework and its `.next` build output. This overrides project settings left over from a generic `dist` deployment.
+
 Run one Node server instance with a persistent local disk and HTTPS in front of it. This SQLite setup is intended for a single-server MVP, not ephemeral serverless disks or multiple independent replicas. For those environments, move the database to a shared managed service before deploying.
 
 Keep the database outside publicly served folders and source control. Back up the database regularly; for a simple consistent backup, stop the server and copy the entire database directory (including any SQLite sidecar files), then restart it. Sessions and private messages are stored in that database.
