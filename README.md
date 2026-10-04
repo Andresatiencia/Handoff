@@ -4,14 +4,14 @@ A working student marketplace for the University of Central Missouri, built with
 
 ## Run locally
 
-Use **Node.js 24 or newer** (the database uses Node's built-in SQLite module).
+Use **Node.js 24 or newer**. The database adapter uses libSQL locally and Turso when hosted credentials are configured.
 
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. No cloud account, API keys, database installation, or seed credentials are required. The server creates `data/handoff.sqlite` and its schema on the first database request. An experimental SQLite notice from Node 24 is expected.
+Open http://localhost:3000. No cloud account, API keys, database installation, or seed credentials are required for local development. Without Turso credentials, the server creates `data/handoff.sqlite` and its schema on the first database request. Existing local SQLite data remains readable by the new adapter.
 
 Create an account at **Sign in → Create account**, then post your first item. The live marketplace starts empty; old mock listings and browser-only conversations are not imported because they have no verified account owner. Landing-page illustrations are decorative examples.
 
@@ -42,10 +42,24 @@ Selecting a university is self-reported affiliation; it does not verify enrollme
 
 ## Configuration and hosting
 
-See `.env.example`. Configuration is optional locally:
+See `.env.example`. Local file configuration is optional:
 
 - `HANDOFF_DB_PATH`: database file location; defaults to `data/handoff.sqlite`.
 - `APP_ORIGIN`: exact public origin, such as `https://handoff.example.com` (no trailing slash). Set this when deploying behind an HTTPS reverse proxy. It controls write-origin checks and Secure session cookies.
+
+### Vercel with Turso
+
+The account, listing, session, and messaging APIs support a persistent Turso database shared by Vercel function instances. The existing password hashing, ownership checks, and private conversations are retained.
+
+1. In the Handoff Vercel project, open **Storage** and connect **Turso** from the Marketplace. Select the free plan if available; no paid plan is needed for this implementation.
+2. Confirm that `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are set in the project's server environment for the deployment being used. These are server secrets: do not prefix them with `NEXT_PUBLIC_` or commit real values.
+3. Set `APP_ORIGIN` to the site's exact public HTTPS origin, without a trailing slash. A preview deployment needs its own origin and a separate test database; avoid connecting preview builds to production accounts.
+4. Deploy the branch containing this adapter. The first database request creates the missing tables and indexes without deleting existing rows. To initialize explicitly before deploying, put the credentials in the ignored `.env.local` file and run `npm run db:setup`.
+5. Test registration in the published site, then sign in from a second browser and verify that the same accounts and listings remain accessible after a redeployment.
+
+The Vercel filesystem is never used for account storage. On Vercel, missing credentials, file URLs, or unencrypted database URLs return a 503 configuration error instead of silently using a temporary SQLite file. The landing page remains available. If only one Turso variable is set locally, the server also rejects that incomplete configuration.
+
+Local accounts are not automatically uploaded to Turso. If existing local data must be retained in the hosted database, arrange an explicit import before inviting users. Use Turso's backup and recovery facilities for hosted data rather than copying files from Vercel.
 
 Production commands:
 
@@ -56,7 +70,7 @@ npm run start
 
 The Vercel configuration explicitly selects the Next.js framework and its `.next` build output. This overrides project settings left over from a generic `dist` deployment.
 
-Run one Node server instance with a persistent local disk and HTTPS in front of it. This SQLite setup is intended for local development and a single server. It cannot store data on Vercel's serverless filesystem. Vercel deployments show a clear 503 storage-configuration error for marketplace API requests, while the landing page remains available. Hosting the functional account, listing, and messaging backend on Vercel requires migrating the SQLite adapter to a managed Postgres provider such as Neon before connecting a database resource. A Postgres adapter is not included yet.
+For deployments using the local file adapter, run one Node server instance with a persistent local disk and HTTPS in front of it. Multiple independent replicas and ephemeral serverless disks require the hosted Turso configuration above.
 
 Keep the database outside publicly served folders and source control. Back up the database regularly; for a simple consistent backup, stop the server and copy the entire database directory (including any SQLite sidecar files), then restart it. Sessions and private messages are stored in that database.
 
@@ -69,7 +83,7 @@ npm run build
 npm run test:integration
 ```
 
-Integration tests require an existing production build. They launch an isolated server on a temporary port with a temporary database, then test multiple users, university and input validation, date filtering, listing ownership, private messages, CSRF checks, logout, and persistence across restart. They do not use the real application database.
+Integration tests require an existing production build. They launch isolated servers on temporary ports with temporary databases, then test multiple users, university and input validation, date filtering, listing ownership, private messages, CSRF checks, logout, and persistence across restart. They also verify that invalid hosted configurations cannot create a local database or issue a registration session. The tests explicitly ignore inherited Turso credentials and never use a real hosted application database.
 
 ## Structure
 
@@ -90,6 +104,6 @@ API:
 - `GET/POST /api/conversations`.
 - `GET/POST /api/conversations/:id/messages`.
 
-Write requests require JSON and an Origin header matching the app origin. Cookies identify the account. No new package dependencies were needed for the backend.
+Write requests require JSON and an Origin header matching the app origin. Cookies identify the account. `@libsql/client` is the database SDK used for both local SQLite and hosted Turso queries.
 
-Reference APIs: [Node SQLite](https://nodejs.org/api/sqlite.html), [Next.js route handlers](https://nextjs.org/docs/app/api-reference/file-conventions/route).
+Reference APIs: [libSQL client](https://tursodatabase.github.io/libsql-client-ts/), [Turso on Vercel](https://vercel.com/marketplace/tursocloud/database), [Next.js route handlers](https://nextjs.org/docs/app/api-reference/file-conventions/route).
