@@ -1,6 +1,7 @@
+import { PageLoading } from "@/components/page-loading";
 import { Suspense } from "react";
 import { Messages } from "@/components/messages";
 
 export default function MessagesPage() {
-  return <Suspense fallback={<main className="page-width py-16">Loading conversations…</main>}><Messages /></Suspense>;
+  return <Suspense fallback={<PageLoading label="Loading conversations…" />}><Messages /></Suspense>;
 }

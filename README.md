@@ -13,7 +13,11 @@ npm run dev
 
 Open http://localhost:3000. No cloud account, API keys, database installation, or seed credentials are required for local development. Without hosted credentials, the server creates `data/handoff.sqlite` and its schema on the first database request. Existing local SQLite data remains readable by the adapter.
 
+Use the same host and port in the browser and in `APP_ORIGIN` when that variable is set. The API compares write requests with this exact origin; mixing `localhost` and `127.0.0.1` can return “Request origin is not allowed.” For a review with a separate local database, start the server with `APP_ORIGIN=http://127.0.0.1:3000`, `HANDOFF_DB_PATH=data/handoff-review.sqlite`, and empty `DATABASE_URL`, `TURSO_DATABASE_URL`, and `TURSO_AUTH_TOKEN`, then use only `http://127.0.0.1:3000` in the browser. Keep the origin check enabled.
+
 Create an account at **Sign in → Create account**, then post your first item. The live marketplace starts empty; old mock listings and browser-only conversations are not imported because they have no verified account owner. Landing-page illustrations are decorative examples.
+
+The Hands design uses illustrative cutout objects on the home page; marketplace cards serve each listing's actual uploaded photo when one exists. The `public/brand` fonts carry their OFL licenses, and the illustrative WebP files carry source notes. There are no new runtime dependencies.
 
 ## Try a real handoff
 

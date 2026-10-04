@@ -9,6 +9,7 @@ import { api } from "@/lib/api-client";
 import { useAuth, AccountGate } from "./auth-provider";
 import { UniversitySelect } from "./university-select";
 import { preparePhoto } from "@/lib/photo";
+import { FlowIntro } from "./flow-intro";
 
 export function SellForm() {
   const params = useSearchParams();
@@ -33,6 +34,7 @@ function ListingForm() {
     if (saving) return;
     setError(""); setSaving(true);
     const fields = Object.fromEntries(new FormData(event.currentTarget));
+    if (String(fields.availableFrom) > String(fields.availableUntil)) { setError("Availability must end on or after its start date."); setSaving(false); return; }
     try {
       const image = photo ? await preparePhoto(photo) : undefined;
       const result = await api<{ listing: Listing }>("listings", {
@@ -46,13 +48,12 @@ function ListingForm() {
     }
   }
 
-  return <main className="page-width py-10 sm:py-14">
+  return <main className="page-width task-page py-10 sm:py-14">
     <Link href="/marketplace" className="nav-link">← Back to marketplace</Link>
-    <div className="mx-auto mt-8 max-w-2xl">
-      
-      <h1 className="mt-3 text-4xl font-semibold tracking-tight">Pass something good along.</h1>
-      <p className="mt-4 leading-7 text-muted">Add your item and when it can be picked up. A price of $0 makes it a free handoff.</p>
-      <form onSubmit={submit} className="mt-8 space-y-5 rounded-3xl border border-ink/10 bg-white p-6 sm:p-8">
+    <div className="flow-layout">
+      <FlowIntro title="Pass something good along." description="Add your item and when it can be picked up. A price of $0 makes it a free handoff." image="kitchen"><div className="flow-progress"><span>Your essential</span><span>Its next chapter</span></div></FlowIntro>
+      <form onSubmit={submit} className="form-panel space-y-5">
+        <h2>Your essential</h2>
         <p className="text-sm text-muted">Posting as <strong className="text-forest">{user?.name}</strong></p>
         <UniversitySelect />
         <label className="block text-sm font-semibold">Item title<input name="title" className="form-input mt-2" required maxLength={80} placeholder="e.g. Mini fridge, ready for a new dorm" /></label>
@@ -68,10 +69,10 @@ function ListingForm() {
           <label className="text-sm font-semibold">Condition<select name="condition" className="form-input mt-2"><option>Good</option><option>Like new</option><option>Used</option></select></label>
           <label className="text-sm font-semibold">Price (USD)<input name="price" type="text" inputMode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" value={price} onChange={event => { const next = event.target.value.replace(",", "."); if (/^[0-9]*([.][0-9]{0,2})?$/.test(next)) setPrice(next); }} required className="form-input mt-2" placeholder="0.00" /><span className="mt-1 block text-xs font-normal text-muted">Use up to 2 decimal places.</span></label>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="form-section"><h2>When can it change hands?</h2><div className="grid gap-5 sm:grid-cols-2">
           <label className="text-sm font-semibold">Available from<input name="availableFrom" type="date" required min="2020-01-01" max="2100-12-31" className="form-input mt-2" /></label>
           <label className="text-sm font-semibold">Available until<input name="availableUntil" type="date" required min="2020-01-01" max="2100-12-31" defaultValue={params.get("departure") ?? ""} className="form-input mt-2" /></label>
-        </div>
+        </div></div>
         {params.get("departure") && <p className="text-xs text-muted">Your leaving date: {params.get("departure")}. Choose pickup dates before you leave.</p>}
         <p className="rounded-xl bg-sand p-3 text-xs leading-5 text-muted">Your item will be visible to everyone browsing Handoff. Interested students can message you privately. If you skip a photo, a category illustration appears instead.</p>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}

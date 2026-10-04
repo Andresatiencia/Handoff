@@ -48,7 +48,7 @@ function CreateBundle() {
     }
   }
 
-  return <main className="page-width py-10 sm:py-14"><Link href="/marketplace" className="nav-link">← Back to marketplace</Link><div className="mx-auto mt-8 max-w-3xl"><p className="eyebrow">For departing students</p><h1 className="mt-3 text-4xl font-semibold tracking-tight">Pass a whole move-in kit along.</h1><p className="mt-4 leading-7 text-muted">Group related essentials into one reservation. Be specific about what is included and when the entire kit is ready.</p>
+  return <main className="page-width task-page py-10 sm:py-14"><Link href="/marketplace" className="nav-link">← Back to marketplace</Link><div className="mx-auto mt-8 max-w-3xl"><p className="eyebrow">For departing students</p><h1 className="mt-3 text-4xl font-semibold tracking-tight">Pass a whole move-in kit along.</h1><p className="mt-4 leading-7 text-muted">Group related essentials into one reservation. Be specific about what is included and when the entire kit is ready.</p>
     <form onSubmit={submit} className="mt-8 space-y-6 rounded-3xl border border-ink/10 bg-white p-6 sm:p-8"><p className="text-sm text-muted">Posting as <strong className="text-forest">{user?.name}</strong></p><UniversitySelect />
       <label className="block text-sm font-semibold">Bundle name<input name="name" required maxLength={80} className="form-input mt-2" placeholder="Kitchen Starter Bundle" /></label>
       <label className="block text-sm font-semibold">What makes this kit useful?<textarea name="description" required maxLength={500} className="form-input mt-2 min-h-24" placeholder="Everything an arriving student needs to cook their first meals." /></label>
