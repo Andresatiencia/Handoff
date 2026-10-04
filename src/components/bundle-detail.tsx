@@ -54,6 +54,7 @@ export function BundleDetail({ id }: { id: string }) {
           {bundle.claimedByMe ? <div role="status" className="mt-6 rounded-xl bg-sand p-5"><p className="text-xl font-bold text-forest">Handoff reserved!</p><p className="mt-2 text-sm">You just reserved {bundle.items.length} move-in essentials for {formatPrice(bundle.priceCents / 100)}.</p><p className="mt-2 text-sm">You saved approximately {formatPrice(savings / 100)} compared with buying them new.</p>{bundle.demo && <p className="mt-3 text-xs text-muted">This is a demo bundle; no real pickup is arranged.</p>}</div>
             : bundle.status === "reserved" ? <p className="mt-6 rounded-xl bg-[#fff1d5] p-4 text-sm font-semibold">This bundle has already been reserved.</p>
             : bundle.sellerId === user?.id ? <p className="mt-6 rounded-xl bg-sand p-4 text-sm">This is your bundle.</p>
+            : user?.emailVerificationRequired ? <Link href="/account" className="button-primary mt-6 w-full">Verify email to claim</Link>
             : user ? <button type="button" onClick={claim} disabled={claiming} className="button-primary mt-6 w-full disabled:opacity-60">{claiming ? "Reserving…" : "Claim Bundle"}</button>
             : <Link href={`/account?next=${encodeURIComponent(detailUrl)}`} className="button-primary mt-6 w-full">Sign in to claim</Link>}
           {claimError && <p role="alert" className="mt-3 text-sm text-red-700">{claimError}</p>}

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, unlink, rmdir } from "node:fs/promises";
+import { mkdtemp, unlink, rmdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:net";
@@ -12,6 +12,7 @@ import { DatabaseSync } from "node:sqlite";
 test("real server: accounts, listings, bundles, private messages, and restart persistence", { timeout: 120000 }, async t => {
   const dir = await mkdtemp(join(tmpdir(), "handoff-backend-"));
   const database = join(dir, "test.sqlite");
+  const outbox = join(dir, "verification-emails.txt");
   const socket = createServer();
   socket.listen(0, "127.0.0.1"); await once(socket, "listening");
   const port = socket.address().port;
@@ -19,9 +20,9 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
   const origin = `http://localhost:${port}`;
   let processHandle;
   let output = "";
-  async function start() {
+  async function start(emailOutbox = outbox) {
     processHandle = spawn(process.execPath, [resolve("node_modules/next/dist/bin/next"), "start", "--port", String(port)], {
-      env: { ...process.env, VERCEL: "", DATABASE_URL: "", TURSO_DATABASE_URL: "", TURSO_AUTH_TOKEN: "", HANDOFF_DB_PATH: database, APP_ORIGIN: origin }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+      env: { ...process.env, VERCEL: "", DATABASE_URL: "", TURSO_DATABASE_URL: "", TURSO_AUTH_TOKEN: "", RESEND_API_KEY: "", HANDOFF_EMAIL_FROM: "", HANDOFF_EMAIL_OUTBOX: emailOutbox, HANDOFF_DB_PATH: database, APP_ORIGIN: origin }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
     });
     processHandle.stdout.on("data", chunk => { output += chunk; });
     processHandle.stderr.on("data", chunk => { output += chunk; });
@@ -41,8 +42,13 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     await stop();
     // Remove only these named temporary test files; never the application's database.
     for (const suffix of ["", "-wal", "-shm"]) await unlink(database + suffix).catch(() => {});
+    await unlink(outbox).catch(() => {});
     await rmdir(dir).catch(() => {});
   });
+  const legacy = new DatabaseSync(database);
+  legacy.exec(`CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, "passwordHash" TEXT NOT NULL, university TEXT NOT NULL);
+    INSERT INTO users(name,email,"passwordHash",university) VALUES('Earlier student','earlier@example.com','legacy-hash','University of Central Missouri');`);
+  legacy.close();
   await start();
   const campus = "University of Central Missouri";
   const password = "Testing-handoff-2026!";
@@ -63,6 +69,18 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
   let sellerId, buyerId, listingId, threadId, secondThreadId, imageId, bundleId;
   const item = { title: "Test desk lamp", description: "Working lamp for a dorm room.", university: campus,
     category: "Bedroom", price: 12.50, condition: "Good", availableFrom: "2026-12-10", availableUntil: "2026-12-17" };
+  async function tokenFor(email) {
+    const lines = (await readFile(outbox, "utf8")).trim().split(/\r?\n/);
+    const line = lines.filter(value => value.startsWith(`${email} `)).at(-1);
+    assert.ok(line, `Verification email for ${email}`);
+    return new URL(line.slice(email.length + 1)).searchParams.get("token");
+  }
+  async function verify(client, email) {
+    const token = await tokenFor(email);
+    assert.equal((await client("auth/verify-email", "POST", { token })).status, 200);
+    assert.equal((await client("auth/verify-email", "POST", { token })).status, 400);
+    assert.equal((await client("auth/me")).data.user.emailVerified, true);
+  }
 
   await t.test("student flows render a university dropdown, not a text field", async () => {
     for (const path of ["/leaving", "/arriving"]) {
@@ -81,11 +99,35 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.match(registered.setCookie, /SameSite=lax/i);
     sellerId = registered.data.user.id;
     assert.equal(registered.data.user.passwordHash, undefined);
+    assert.equal(registered.data.user.emailVerificationRequired, true);
+    assert.equal(registered.data.emailSent, true);
     assert.equal((await seller("auth/me")).data.user.id, sellerId);
+    assert.equal((await seller("listings", "POST", item)).status, 403);
+    const oldToken = await tokenFor("seller@example.com");
+    assert.equal((await seller("auth/resend-verification", "POST")).status, 200);
+    assert.equal((await seller("auth/verify-email", "POST", { token: oldToken })).status, 400);
+    await verify(seller, "seller@example.com");
     assert.equal((await anonymous("auth/me")).data.user, null);
     assert.equal((await anonymous("auth/register", "POST", { name: "Duplicate", email: "SELLER@example.com", password, university: campus })).status, 409);
     buyerId = (await buyer("auth/register", "POST", { name: "Buyer", email: "buyer@example.com", password, university: campus })).data.user.id;
+    assert.equal((await buyer("bundles/demo-kitchen/claim", "POST")).status, 403);
+    await verify(buyer, "buyer@example.com");
     assert.equal((await stranger("auth/register", "POST", { name: "Another buyer", email: "third@example.com", password, university: campus })).status, 201);
+    await verify(stranger, "third@example.com");
+  });
+
+  await t.test("expired verification links cannot verify an address", async () => {
+    const late = client();
+    const registered = await late("auth/register", "POST", { name: "Late verifier", email: "late@example.com", password, university: campus });
+    assert.equal(registered.status, 201);
+    const token = await tokenFor("late@example.com");
+    const inspection = new DatabaseSync(database);
+    inspection.prepare("UPDATE email_verifications SET expiresAt=0 WHERE userId=?").run(registered.data.user.id);
+    inspection.close();
+    assert.equal((await late("auth/verify-email", "POST", { token })).status, 400);
+    assert.equal((await late("auth/me")).data.user.emailVerificationRequired, true);
+    assert.equal((await late("auth/resend-verification", "POST")).status, 200);
+    await verify(late, "late@example.com");
   });
 
   await t.test("posting validates server-side data and derives ownership from the session", async () => {
@@ -114,6 +156,13 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.equal((await anonymous("listings?categories=Kitchen")).data.listings.length, 0);
     assert.equal((await anonymous("listings?arrival=bad")).status, 400);
     assert.equal((await anonymous("listings?university=Other")).status, 400);
+  });
+
+  await t.test("existing accounts are grandfathered when the verification column is added", async () => {
+    await anonymous("bundles");
+    const inspection = new DatabaseSync(database, { readOnly: true });
+    assert.equal(inspection.prepare("SELECT emailVerifiedAt FROM users WHERE email='earlier@example.com'").get().emailVerifiedAt, "legacy");
+    inspection.close();
   });
 
   await t.test("bundles group items and reserve atomically for one buyer", async () => {
@@ -188,6 +237,7 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.equal((await seller(`listings/${listingId}`, "PATCH", { status: "sold" })).data.listing.status, "sold");
     const fourth = client();
     await fourth("auth/register", "POST", { name: "Late buyer", email: "fourth@example.com", password, university: campus });
+    await verify(fourth, "fourth@example.com");
     assert.equal((await fourth("conversations", "POST", { listingId })).status, 409);
     assert.equal((await buyer("conversations", "POST", { listingId })).data.conversation.id, threadId);
   });
@@ -260,6 +310,18 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     const results = await anonymous("listings?minPrice=0&maxPrice=0");
     assert.deepEqual(results.data.listings.map(listing => listing.id), [free.data.listing.id]);
     assert.equal((await seller(`listings/${free.data.listing.id}`, "DELETE")).status, 200);
+  });
+
+  await t.test("without a mail provider, production keeps the existing signup behavior", async () => {
+    await stop(); await start("");
+    const account = client();
+    const registered = await account("auth/register", "POST", { name: "Before email setup", email: "before-setup@example.com", password, university: campus });
+    assert.equal(registered.status, 201);
+    assert.equal(registered.data.user.emailVerificationRequired, false);
+    assert.equal(registered.data.user.emailVerified, false);
+    const posted = await account("listings", "POST", { ...item, title: "Pre-setup item" });
+    assert.equal(posted.status, 201);
+    assert.equal((await account(`listings/${posted.data.listing.id}`, "DELETE")).status, 200);
   });
 
   await t.test("repeated failed login attempts are throttled", async () => {

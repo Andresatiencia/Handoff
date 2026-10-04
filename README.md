@@ -35,6 +35,7 @@ Both browsers must access the **same running Handoff server**. Different localho
 Bundles: Sellers can open **Create a bundle** from the marketplace, group 2–12 named items with conditions and an availability window, and enter a bundle price and estimated new cost. Arriving students can add specific needs on the arrival form; cards calculate coverage, timing, and estimated savings. A signed-in buyer can reserve a whole bundle in one action. The five labeled demo bundles have personal demo reservations and do not arrange pickup; a bundle posted by a real account can be reserved by only one buyer.
 
 - Registration, sign-in, sign-out, seven-day server-side sessions, and account ownership.
+- Optional email ownership verification for new accounts. When Resend is configured, a 24-hour, single-use link is sent after registration; unverified accounts can browse but cannot post, claim, or send messages. Existing accounts remain usable.
 - Salted scrypt password hashes and random session tokens stored as SHA-256 hashes; HttpOnly, SameSite cookies, with Secure cookies when the configured origin uses HTTPS.
 - Persistent shared listings, seller status management and deletion, server validation, product photos, and prices stored as integer cents. The price form accepts at most two decimal places.
 - Seller-created bundles and database-backed reservations. Bundle matches and savings use entered items, needs, dates, and estimated retail values; no payment is collected.
@@ -48,6 +49,12 @@ Bundles: Sellers can open **Create a bundle** from the marketplace, group 2–12
 Selecting a university is self-reported affiliation; it does not verify enrollment. Payments, email verification, password recovery, notifications, moderation, and buyer claiming of individual listings are not implemented. Sellers reserve and close individual listings manually; pickup arrangements for those items happen in messages. Deleting a listing also permanently removes its photo and associated conversations and messages. These are follow-up features, not simulated backend behavior.
 
 ## Configuration and hosting
+
+### Email verification
+
+To activate real verification for **new** production accounts, verify a sending domain in [Resend](https://resend.com/docs/dashboard/domains/introduction), then set both `RESEND_API_KEY` and `HANDOFF_EMAIL_FROM` in the Vercel project's environment variables. Example sender: `Handoff <verify@your-domain.example>`. Redeploy after adding them. The server calls Resend's email API directly; no package is required. Do not put the API key in a `NEXT_PUBLIC_` variable or commit it. Without both settings, production keeps the prior signup behavior and does **not** claim to verify new addresses. Accounts created before activation remain grandfathered; their mailbox ownership is unknown.
+
+During local `npm run dev`, verification links are written to the server console if Resend is not configured. This is a local development aid only. The link expires after 24 hours and can be used once. Users can request a replacement from their account page; this invalidates the previous link. Opening the link presents a confirmation button so email previewers do not verify accounts merely by loading the URL. Confirming ownership proves access to the mailbox at that moment, not that the mailbox will remain active forever.
 
 Bundle claims reserve the grouped items in Handoff. Pickup coordination for bundles is not yet integrated with item messaging. Estimated new costs are seller-entered, and arrival needs travel in the marketplace URL rather than an account profile.
 
@@ -106,10 +113,11 @@ Integration tests require an existing production build. They launch isolated ser
 - `src/components/account.tsx`, `sell-form.tsx`, `marketplace.tsx`, `messages.tsx`: live application flows.
 - `tests/backend.test.mjs`: end-to-end API integration tests.
 
-Routes: `/`, `/account`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/bundles/new`, `/bundles/:id`, `/messages`.
+Routes: `/`, `/account`, `/verify-email`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/bundles/new`, `/bundles/:id`, `/messages`.
 
 API:
 - `GET /api/auth/me`; `POST /api/auth/register|login|logout`.
+- `POST /api/auth/resend-verification`; `POST /api/auth/verify-email`.
 - `GET/POST /api/listings`; `GET/PATCH/DELETE /api/listings/:id` (PATCH changes status; DELETE is seller-only); `GET /api/listings/:id/image`.
 - `GET/POST /api/bundles`; `GET /api/bundles/:id`; `POST /api/bundles/:id/claim`.
 - `GET/POST /api/conversations`.
