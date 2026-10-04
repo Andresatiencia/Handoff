@@ -21,7 +21,7 @@ test("real server: accounts, listings, private messages, and restart persistence
   let output = "";
   async function start() {
     processHandle = spawn(process.execPath, [resolve("node_modules/next/dist/bin/next"), "start", "--port", String(port)], {
-      env: { ...process.env, HANDOFF_DB_PATH: database, APP_ORIGIN: origin }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+      env: { ...process.env, VERCEL: "", TURSO_DATABASE_URL: "", TURSO_AUTH_TOKEN: "", HANDOFF_DB_PATH: database, APP_ORIGIN: origin }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
     });
     processHandle.stdout.on("data", chunk => { output += chunk; });
     processHandle.stderr.on("data", chunk => { output += chunk; });
@@ -98,6 +98,9 @@ test("real server: accounts, listings, private messages, and restart persistence
     listingId = created.data.listing.id;
     assert.equal(created.data.listing.sellerId, sellerId);
     assert.equal(created.data.listing.sellerName, "Seller");
+    const persisted = await buyer(`listings/${listingId}`);
+    assert.equal(persisted.data.listing.illustration, "lamp");
+    assert.equal(persisted.data.listing.color, "#e6ebe4");
     assert.equal((await buyer("listings")).data.listings[0].id, listingId);
     assert.equal((await buyer("listings?mine=true")).data.listings.length, 0);
     assert.equal((await seller("listings?mine=true")).data.listings.length, 1);
