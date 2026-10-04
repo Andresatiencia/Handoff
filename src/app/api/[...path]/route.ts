@@ -107,13 +107,12 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
         const campus = university(data.university);
         const hash = await passwordHash(data.password);
         try {
-          const required = verificationEnabled();
-          const result = await row<{ id: number }>("INSERT INTO users(name,email,\"passwordHash\",university,\"emailVerifiedAt\") VALUES($1,$2,$3,$4,$5) RETURNING id", name, email, hash, campus, required ? null : "legacy");
-          user = { id: Number(result!.id), name, email, university: campus, emailVerified: false, emailVerificationRequired: required };
-          if (required) {
+          const result = await row<{ id: number }>("INSERT INTO users(name,email,\"passwordHash\",university,\"emailVerifiedAt\") VALUES($1,$2,$3,$4,$5) RETURNING id", name, email, hash, campus, null);
+          user = { id: Number(result!.id), name, email, university: campus, emailVerified: false, emailVerificationRequired: true };
+          if (verificationEnabled()) {
             try { await issueVerification(user.id, email, process.env.APP_ORIGIN ?? request.nextUrl.origin); emailSent = true; }
             catch (error) { emailSent = false; emailError = emailDeliveryMessage(error); }
-          }
+          } else { emailSent = false; emailError = "Email delivery is not configured. Connect Google or check back later to verify this account."; }
         } catch (error) {
           if (String(error).toLowerCase().includes("unique") || (error as { code?: string }).code === "23505") throw new HttpError(409, "An account with this email already exists. Sign in instead.");
           throw error;
@@ -122,10 +121,11 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
         const account = await row<User & { passwordHash: string; emailVerifiedAt: string | null }>("SELECT * FROM users WHERE email=$1", email);
         // Perform the same password work for unknown addresses.
         const fallback = `00000000000000000000000000000000:${"00".repeat(64)}`;
-        const valid = await verifyPassword(data.password, account?.passwordHash ?? fallback);
+        const valid = await verifyPassword(data.password, account?.passwordHash?.startsWith("google-only:") ? fallback : account?.passwordHash ?? fallback);
         if (!account || !valid) throw new HttpError(401, "Email or password is incorrect.");
         user = { id: account.id, name: account.name, email: account.email, university: account.university,
-          emailVerified: Boolean(account.emailVerifiedAt && account.emailVerifiedAt !== "legacy"), emailVerificationRequired: account.emailVerifiedAt === null };
+          emailVerified: Boolean(account.emailVerifiedAt && account.emailVerifiedAt !== "legacy"),
+          emailVerificationRequired: !account.emailVerifiedAt || account.emailVerifiedAt === "legacy" };
       }
       const response = json({ user, emailSent, emailError }, route === "auth/register" ? 201 : 200);
       await startSession(request, response, user.id); return response;

@@ -20,9 +20,11 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
   const origin = `http://localhost:${port}`;
   let processHandle;
   let output = "";
-  async function start(emailOutbox = outbox) {
+  async function start(emailOutbox = outbox, google = false) {
     processHandle = spawn(process.execPath, [resolve("node_modules/next/dist/bin/next"), "start", "--port", String(port)], {
-      env: { ...process.env, VERCEL: "", DATABASE_URL: "", TURSO_DATABASE_URL: "", TURSO_AUTH_TOKEN: "", RESEND_API_KEY: "", HANDOFF_EMAIL_FROM: "", HANDOFF_EMAIL_OUTBOX: emailOutbox, HANDOFF_DB_PATH: database, APP_ORIGIN: origin }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+      env: { ...process.env, VERCEL: "", DATABASE_URL: "", TURSO_DATABASE_URL: "", TURSO_AUTH_TOKEN: "", RESEND_API_KEY: "", HANDOFF_EMAIL_FROM: "", HANDOFF_EMAIL_OUTBOX: emailOutbox, HANDOFF_DB_PATH: database, APP_ORIGIN: origin,
+        GOOGLE_CLIENT_ID: google ? "test.apps.googleusercontent.com" : "", GOOGLE_CLIENT_SECRET: google ? "test-secret" : "" },
+      stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
     });
     processHandle.stdout.on("data", chunk => { output += chunk; });
     processHandle.stderr.on("data", chunk => { output += chunk; });
@@ -158,7 +160,7 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.equal((await anonymous("listings?university=Other")).status, 400);
   });
 
-  await t.test("existing accounts are grandfathered when the verification column is added", async () => {
+  await t.test("existing unverified accounts retain their marker after migration", async () => {
     await anonymous("bundles");
     const inspection = new DatabaseSync(database, { readOnly: true });
     assert.equal(inspection.prepare("SELECT emailVerifiedAt FROM users WHERE email='earlier@example.com'").get().emailVerifiedAt, "legacy");
@@ -335,16 +337,50 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     await verify(another, "retry@example.com");
   });
 
-  await t.test("without a mail provider, production keeps the existing signup behavior", async () => {
+  await t.test("without a mail provider, password accounts remain unverified and can only browse", async () => {
     await stop(); await start("");
     const account = client();
     const registered = await account("auth/register", "POST", { name: "Before email setup", email: "before-setup@example.com", password, university: campus });
     assert.equal(registered.status, 201);
-    assert.equal(registered.data.user.emailVerificationRequired, false);
+    assert.equal(registered.data.user.emailVerificationRequired, true);
     assert.equal(registered.data.user.emailVerified, false);
-    const posted = await account("listings", "POST", { ...item, title: "Pre-setup item" });
-    assert.equal(posted.status, 201);
-    assert.equal((await account(`listings/${posted.data.listing.id}`, "DELETE")).status, 200);
+    assert.equal(registered.data.emailSent, false);
+    assert.equal((await account("listings", "POST", { ...item, title: "Pre-setup item" })).status, 403);
+    assert.equal((await account("bundles/demo-bedroom/claim", "POST")).status, 403);
+    assert.equal((await account("listings")).status, 200);
+    assert.equal((await fetch(`${origin}/api/auth/google/start`, { redirect: "manual" })).status, 503);
+    const inspection = new DatabaseSync(database, { readOnly: true });
+    assert.ok(inspection.prepare("PRAGMA table_info(users)").all().some(column => column.name === "googleSub"));
+    inspection.close();
+  });
+
+  await t.test("Google sign-in starts with protected state and a registered callback", async () => {
+    await stop(); await start("", true);
+    const started = await fetch(`${origin}/api/auth/google/start?next=%2Fmarketplace`, { redirect: "manual" });
+    assert.equal(started.status, 307);
+    assert.match(started.headers.get("set-cookie"), /handoff_google_flow=.*HttpOnly/i);
+    const redirect = new URL(started.headers.get("location"));
+    assert.equal(redirect.origin, "https://accounts.google.com");
+    assert.equal(redirect.searchParams.get("redirect_uri"), `${origin}/api/auth/google/callback`);
+    assert.equal(redirect.searchParams.get("code_challenge_method"), "S256");
+    assert.equal(redirect.searchParams.get("scope"), "openid email profile");
+    const rejected = await fetch(`${origin}/api/auth/google/callback?code=fake&state=wrong`, {
+      headers: { Cookie: started.headers.get("set-cookie").split(";")[0] }, redirect: "manual",
+    });
+    assert.equal(rejected.status, 307);
+    assert.match(rejected.headers.get("location"), /google_error=/);
+    assert.equal((await anonymous("auth/me")).data.user, null);
+    await stop(); await start();
+  });
+
+  await t.test("Google identity is unique and a Google-only account has no password login", async () => {
+    const inspection = new DatabaseSync(database);
+    inspection.prepare(`INSERT INTO users(name,email,"passwordHash",university,"emailVerifiedAt","googleSub") VALUES(?,?,?,?,?,?)`)
+      .run("Google student", "google@example.com", "google-only:unusable", campus, new Date().toISOString(), "google-sub-123");
+    assert.throws(() => inspection.prepare(`INSERT INTO users(name,email,"passwordHash",university,"emailVerifiedAt","googleSub") VALUES(?,?,?,?,?,?)`)
+      .run("Duplicate", "other@example.com", "google-only:unusable", campus, new Date().toISOString(), "google-sub-123"));
+    inspection.close();
+    assert.equal((await anonymous("auth/login", "POST", { email: "google@example.com", password })).status, 401);
   });
 
   await t.test("repeated failed login attempts are throttled", async () => {

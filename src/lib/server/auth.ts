@@ -29,7 +29,8 @@ export async function currentUser(request: NextRequest): Promise<User | null> {
   const account = await row<Pick<User, "id" | "name" | "email" | "university"> & { emailVerifiedAt: string | null }>(`SELECT u.id,u.name,u.email,u.university,u."emailVerifiedAt" FROM sessions s JOIN users u ON u.id=s."userId"
     WHERE s."tokenHash"=$1 AND s."expiresAt">$2`, digest(token), Date.now());
   return account ? { id: account.id, name: account.name, email: account.email, university: account.university,
-    emailVerified: Boolean(account.emailVerifiedAt && account.emailVerifiedAt !== "legacy"), emailVerificationRequired: account.emailVerifiedAt === null } : null;
+    emailVerified: Boolean(account.emailVerifiedAt && account.emailVerifiedAt !== "legacy"),
+    emailVerificationRequired: !account.emailVerifiedAt || account.emailVerifiedAt === "legacy" } : null;
 }
 
 export async function requireUser(request: NextRequest) {
@@ -40,7 +41,7 @@ export async function requireUser(request: NextRequest) {
 
 export async function requireVerifiedUser(request: NextRequest) {
   const user = await requireUser(request);
-  if (user.emailVerificationRequired) throw new HttpError(403, "Verify your email address before using this feature.");
+  if (!user.emailVerified) throw new HttpError(403, "Verify your email address before using this feature.");
   return user;
 }
 
