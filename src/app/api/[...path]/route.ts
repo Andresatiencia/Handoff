@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteListing, row, rows, StorageUnavailable } from "@/lib/server/db";
 import { currentUser, requireUser, passwordHash, verifyPassword, startSession, endSession, limit } from "@/lib/server/auth";
-import { HttpError, text, date, university, listingInput } from "@/lib/server/validation";
+import { HttpError, text, date, university, listingInput, priceBound } from "@/lib/server/validation";
 import { getListing, listingSelect } from "@/lib/server/listings";
 import { categories } from "@/lib/listings";
 import type { Conversation, User } from "@/lib/contracts";
@@ -113,6 +113,13 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       if (params.get("mine") === "true") { clauses.push(`l."sellerId"=$${values.length + 1}`); values.push((await requireUser(request)).id); }
       if (params.get("university")) { clauses.push(`l.university=$${values.length + 1}`); values.push(university(params.get("university"))); }
       if (params.get("arrival")) { const arrival = date(params.get("arrival")); clauses.push(`l."availableFrom"<=$${values.length + 1} AND l."availableUntil">=$${values.length + 2}`); values.push(arrival, arrival); }
+      const minimum = params.get("minPrice");
+      const maximum = params.get("maxPrice");
+      const minimumCents = minimum === null ? null : priceBound(minimum, "Minimum price");
+      const maximumCents = maximum === null ? null : priceBound(maximum, "Maximum price");
+      if (minimumCents !== null && maximumCents !== null && minimumCents > maximumCents) throw new HttpError(400, "Minimum price cannot exceed maximum price.");
+      if (minimumCents !== null) { clauses.push(`l."priceCents">=$${values.length + 1}`); values.push(minimumCents); }
+      if (maximumCents !== null) { clauses.push(`l."priceCents"<=$${values.length + 1}`); values.push(maximumCents); }
       if (params.get("available") === "true") clauses.push("l.status='available'");
       if (params.get("q")) { clauses.push(`lower(l.title) LIKE $${values.length + 1} ESCAPE '\\'`); values.push(`%${text(params.get("q"), "Search", 100).toLowerCase().replace(/[\\%_]/g, "\\$&")}%`); }
       if (params.get("categories")) {

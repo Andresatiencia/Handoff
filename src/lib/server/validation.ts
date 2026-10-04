@@ -26,6 +26,13 @@ export function university(value: unknown) {
   return UNIVERSITY;
 }
 
+export function priceBound(value: string, label: string) {
+  if (!/^[0-9]+([.][0-9]{1,2})?$/.test(value) || Number(value) > 100000) {
+    throw new HttpError(400, `Enter a valid ${label.toLowerCase()} between $0 and $100,000 with at most two decimals.`);
+  }
+  return Math.round(Number(value) * 100);
+}
+
 export function listingInput(data: Record<string, unknown>) {
   const title = text(data.title, "Title", 80);
   const description = text(data.description, "Description", 1500);

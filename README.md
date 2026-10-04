@@ -31,7 +31,7 @@ Both browsers must access the **same running Handoff server**. Different localho
 - Registration, sign-in, sign-out, seven-day server-side sessions, and account ownership.
 - Salted scrypt password hashes and random session tokens stored as SHA-256 hashes; HttpOnly, SameSite cookies, with Secure cookies when the configured origin uses HTTPS.
 - Persistent shared listings, seller status management and deletion, server validation, product photos, and prices stored as integer cents. The price form accepts at most two decimal places.
-- Public browsing with category, search, status, university, and inclusive arrival-date filters.
+- Public browsing with category, search, status, university, inclusive arrival-date, and optional minimum/maximum price filters. Price ranges include their endpoints and can be shared through `minPrice` and `maxPrice` URL parameters.
 - Only University of Central Missouri is selectable; the API enforces this restriction.
 - Private per-buyer/per-listing conversations, sender identity from the session, and polling for new messages.
 - Database-backed rate limits for authentication, listing creation, conversations, and messages.

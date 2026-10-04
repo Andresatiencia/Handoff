@@ -116,6 +116,16 @@ test("real server: accounts, listings, private messages, and restart persistence
     assert.equal((await anonymous("listings?university=Other")).status, 400);
   });
 
+  await t.test("optional price bounds include endpoints and combine with other filters", async () => {
+    assert.equal((await anonymous("listings?minPrice=12.50&maxPrice=12.50&arrival=2026-12-10&categories=Bedroom")).data.listings.length, 1);
+    assert.equal((await anonymous("listings?minPrice=12.51")).data.listings.length, 0);
+    assert.equal((await anonymous("listings?maxPrice=12.49")).data.listings.length, 0);
+    assert.equal((await anonymous("listings?minPrice=0")).data.listings.length, 1);
+    for (const query of ["minPrice=-1", "minPrice=1.234", "maxPrice=100000.01", "minPrice=20&maxPrice=10", "maxPrice="]) {
+      assert.equal((await anonymous(`listings?${query}`)).status, 400, query);
+    }
+  });
+
   await t.test("different buyers have separate conversations and cannot impersonate a sender", async () => {
     assert.equal((await anonymous("conversations")).status, 401);
     assert.equal((await seller("conversations", "POST", { listingId })).status, 400);
@@ -207,6 +217,14 @@ test("real server: accounts, listings, private messages, and restart persistence
     assert.equal(inspection.prepare("SELECT COUNT(*) AS total FROM conversations").get().total, 0);
     assert.equal(inspection.prepare("SELECT COUNT(*) AS total FROM messages").get().total, 0);
     inspection.close();
+  });
+
+  await t.test("a zero-dollar listing is included in a free-only price range", async () => {
+    const free = await seller("listings", "POST", { ...item, title: "Free lamp", price: 0 });
+    assert.equal(free.status, 201);
+    const results = await anonymous("listings?minPrice=0&maxPrice=0");
+    assert.deepEqual(results.data.listings.map(listing => listing.id), [free.data.listing.id]);
+    assert.equal((await seller(`listings/${free.data.listing.id}`, "DELETE")).status, 200);
   });
 
   await t.test("repeated failed login attempts are throttled", async () => {
