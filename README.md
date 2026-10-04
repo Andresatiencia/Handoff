@@ -37,7 +37,7 @@ Bundles: Sellers can open **Create a bundle** from the marketplace, group 2–12
 - Registration, sign-in, sign-out, seven-day server-side sessions, and account ownership.
 - Google Sign-In and email/password accounts share Handoff users and sessions. Signed-in users can post, claim, and message without email verification. Older password accounts retain their profiles and gain the same access.
 - Salted scrypt password hashes and random session tokens stored as SHA-256 hashes; HttpOnly, SameSite cookies, with Secure cookies when the configured origin uses HTTPS.
-- Persistent shared listings, seller status management and deletion, server validation, product photos, and prices stored as integer cents. The price form accepts at most two decimal places.
+- Persistent shared listings with public detail pages, seller editing, status management and deletion, server validation, product photos, and prices stored as integer cents. The price form accepts at most two decimal places.
 - Seller-created bundles and database-backed reservations. Bundle matches and savings use entered items, needs, dates, and estimated retail values; no payment is collected.
 - Public browsing with category, search, status, university, inclusive arrival-date, and optional minimum/maximum price filters. Price ranges include their endpoints and can be shared through `minPrice` and `maxPrice` URL parameters.
 - Only University of Central Missouri is selectable; the API enforces this restriction.
@@ -117,11 +117,11 @@ Integration tests require an existing production build. They launch isolated ser
 - `src/components/account.tsx`, `sell-form.tsx`, `marketplace.tsx`, `messages.tsx`: live application flows.
 - `tests/backend.test.mjs`: end-to-end API integration tests.
 
-Routes: `/`, `/account`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/bundles/new`, `/bundles/:id`, `/messages`. Old `/verify-email` links redirect to `/account`.
+Routes: `/`, `/account`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/listings/:id`, `/listings/:id/edit`, `/bundles/new`, `/bundles/:id`, `/messages`. Old `/verify-email` links redirect to `/account`.
 
 API:
 - `GET /api/auth/me`; `POST /api/auth/register|login|logout`.
-- `GET/POST /api/listings`; `GET/PATCH/DELETE /api/listings/:id` (PATCH changes status; DELETE is seller-only); `GET /api/listings/:id/image`.
+- `GET/POST /api/listings`; `GET/PATCH/DELETE /api/listings/:id` (seller-only PATCH edits details or status; DELETE is seller-only); `GET /api/listings/:id/image`.
 - `GET/POST /api/bundles`; `GET /api/bundles/:id`; `POST /api/bundles/:id/claim`.
 - `GET/POST /api/conversations`.
 - `GET/POST /api/conversations/:id/messages`.

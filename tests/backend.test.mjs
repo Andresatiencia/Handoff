@@ -143,6 +143,26 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.equal((await earlier("bundles/demo-bedroom/claim", "POST")).status, 201);
   });
 
+  await t.test("listing details open and only the seller can edit them", async () => {
+    assert.equal((await fetch(`${origin}/listings/${listingId}`)).status, 200);
+    assert.equal((await fetch(`${origin}/listings/${listingId}/edit`)).status, 200);
+    const changes = { ...item, title: "Updated desk lamp", description: "New details and pickup instructions.",
+      price: 18.25, condition: "Like new", availableUntil: "2026-12-20" };
+    assert.equal((await anonymous(`listings/${listingId}`, "PATCH", changes)).status, 401);
+    assert.equal((await buyer(`listings/${listingId}`, "PATCH", changes)).status, 403);
+    assert.equal((await seller(`listings/${listingId}`, "PATCH", { ...changes, price: 18.256 })).status, 400);
+    assert.equal((await seller(`listings/${listingId}`, "PATCH", { ...changes, availableUntil: "2026-12-01" })).status, 400);
+    const updated = await seller(`listings/${listingId}`, "PATCH", changes);
+    assert.equal(updated.status, 200);
+    assert.equal(updated.data.listing.title, changes.title);
+    assert.equal(updated.data.listing.description, changes.description);
+    assert.equal(updated.data.listing.price, changes.price);
+    assert.equal(updated.data.listing.condition, changes.condition);
+    assert.equal(updated.data.listing.availableUntil, changes.availableUntil);
+    assert.equal((await buyer(`listings/${listingId}`)).data.listing.title, changes.title);
+    assert.equal((await seller(`listings/${listingId}`, "PATCH", item)).status, 200);
+  });
+
   await t.test("bundles group items and reserve atomically for one buyer", async () => {
     const demos = await anonymous("bundles");
     assert.equal(demos.status, 200);
@@ -231,7 +251,15 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.equal(image.headers.get("content-type"), "image/png");
     assert.equal(image.headers.get("cache-control"), "no-store");
     assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
+    assert.equal((await seller(`listings/${imageId}`, "PATCH", { ...item, title: "Updated photo listing" })).status, 200);
+    assert.equal((await fetch(`${origin}/api/listings/${imageId}/image`)).status, 200);
+    assert.equal((await seller(`listings/${imageId}`, "PATCH", { ...item, title: "Photo listing", image: { mime: "image/jpeg", data: png.toString("base64") } })).status, 400);
     assert.equal((await seller(`listings/${imageId}`, "PATCH", { status: "sold" })).status, 200);
+    const removable = await seller("listings", "POST", { ...item, title: "Temporary photo", image: { mime: "image/png", data: png.toString("base64") } });
+    assert.equal(removable.status, 201);
+    assert.equal((await seller(`listings/${removable.data.listing.id}`, "PATCH", { ...item, title: "Temporary photo", image: null })).data.listing.hasImage, 0);
+    assert.equal((await fetch(`${origin}/api/listings/${removable.data.listing.id}/image`)).status, 404);
+    assert.equal((await seller(`listings/${removable.data.listing.id}`, "DELETE")).status, 200);
   });
 
   await t.test("CSRF, request size, password checks, and logout are enforced", async () => {

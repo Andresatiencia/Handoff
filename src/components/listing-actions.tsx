@@ -8,7 +8,7 @@ import type { Conversation } from "@/lib/contracts";
 import { api } from "@/lib/api-client";
 import { useAuth } from "./auth-provider";
 
-export function ListingActions({ listing, onChange }: { listing: Listing; onChange?: () => void }) {
+export function ListingActions({ listing, onChange, onDelete }: { listing: Listing; onChange?: () => void; onDelete?: () => void }) {
   const { user } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
@@ -31,7 +31,7 @@ export function ListingActions({ listing, onChange }: { listing: Listing; onChan
   async function remove() {
     if (!window.confirm("Delete this listing? Its photo and all related conversations and messages will also be deleted. This cannot be undone.")) return;
     setBusy(true); setError("");
-    try { await api(`listings/${listing.id}`, { method: "DELETE" }); onChange?.(); router.refresh(); }
+    try { await api(`listings/${listing.id}`, { method: "DELETE" }); onDelete?.(); onChange?.(); router.refresh(); }
     catch (error) { setError(error instanceof Error ? error.message : "Could not delete item."); }
     finally { setBusy(false); }
   }

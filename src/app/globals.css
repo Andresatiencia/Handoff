@@ -115,7 +115,7 @@ input::placeholder,textarea::placeholder{color:#786a60}
 .listing-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
 .listing-card{display:flex;flex-direction:column;min-width:0;background:var(--surface);border-radius:12px;overflow:hidden;border:1px solid var(--line)}
 .listing-photo{position:relative;background:var(--color-sand);overflow:hidden}
-.listing-photo>img,.listing-photo>svg{height:230px;width:100%;object-fit:contain}
+.listing-photo>a>img,.listing-photo>a>svg{height:230px;width:100%;object-fit:contain}
 .listing-photo-empty{height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;background:#e9dfd2;color:var(--color-ink);padding:22px}
 .listing-photo-empty span{font:800 15px Manrope,sans-serif;letter-spacing:-.04em;color:var(--color-forest)}
 .listing-photo-empty strong{font:400 clamp(26px,3vw,35px) Instrument,Georgia,serif;line-height:1.1;overflow-wrap:anywhere}
@@ -146,7 +146,7 @@ input::placeholder,textarea::placeholder{color:#786a60}
 .task-page .rounded-3xl{border-radius:12px}.task-page .shadow-sm{box-shadow:none}.task-page .bg-white{background:var(--surface)}
 .task-page .rounded-2xl{border-radius:12px}
 @media(hover:hover) and (pointer:fine){.button-primary:hover{background:#863725}.button-secondary:hover{background:var(--color-sand)}a:hover,.photo-object:hover{color:var(--color-forest)}.button-primary:hover{color:white}}
-@media(max-width:1050px){.main-navigation{gap:17px;font-size:12px}.flow-layout{gap:40px}.hero-heading h1{font-size:76px!important}.photo-object{width:185px}.photo-object img{height:225px}.object-detail{width:155px}.listing-photo>img,.listing-photo>svg,.listing-photo-empty{height:200px}.market-layout{grid-template-columns:230px 1fr;gap:24px}}
+@media(max-width:1050px){.main-navigation{gap:17px;font-size:12px}.flow-layout{gap:40px}.hero-heading h1{font-size:76px!important}.photo-object{width:185px}.photo-object img{height:225px}.object-detail{width:155px}.listing-photo>a>img,.listing-photo>a>svg,.listing-photo-empty{height:200px}.market-layout{grid-template-columns:230px 1fr;gap:24px}}
 @media(max-width:760px){
  .page-width{padding-left:22px;padding-right:22px}
  .header-inner{min-height:74px;flex-wrap:wrap;gap:0}.wordmark{font-size:26px}.wordmark svg{width:27px}
@@ -177,7 +177,7 @@ input::placeholder,textarea::placeholder{color:#786a60}
  .market-header{display:block}.market-header>div+div{margin-top:20px}.market-header h1{font-size:46px!important}
  .market-layout{display:block;margin-top:18px}.market-filters{position:static;padding:18px;display:none;margin-bottom:25px}.market-filters.is-open{display:block}
  .filter-toggle{display:flex;width:100%;margin-bottom:18px;justify-content:space-between}
- .listing-grid{grid-template-columns:1fr;gap:23px}.listing-photo>img,.listing-photo>svg,.listing-photo-empty{height:235px}
+ .listing-grid{grid-template-columns:1fr;gap:23px}.listing-photo>a>img,.listing-photo>a>svg,.listing-photo-empty{height:235px}
  .bundles-section{margin-top:37px;padding-top:28px}.inbox-layout{grid-template-columns:1fr;gap:20px}
  .inbox-sidebar nav{display:flex;overflow:auto;gap:8px}.inbox-sidebar nav a{min-width:180px;max-width:220px}
  .message-log{height:340px;padding:17px}.empty-state{padding:28px 20px}

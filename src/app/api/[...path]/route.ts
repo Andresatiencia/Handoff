@@ -188,9 +188,23 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       if (method === "PATCH") {
         const user = await requireUser(request);
         if (listing.sellerId !== user.id) throw new HttpError(403, "Only the seller can change this listing.");
-        const data = await body(request);
-        if (typeof data.status !== "string" || !["available", "reserved", "sold"].includes(data.status)) throw new HttpError(400, "Choose a valid status.");
-        await rows("UPDATE listings SET status=$1 WHERE id=$2 AND \"sellerId\"=$3", String(data.status), id, user.id);
+        const data = await body(request, 1_100_000);
+        if ("title" in data) {
+          const updated = listingInput(data);
+          const image = "image" in data ? imageInput(data.image) : undefined;
+          const imageColumns = image ? ',"imageData"=$11,"imageMime"=$12' : "";
+          const values = [updated.title, updated.description, updated.university, updated.category,
+            updated.priceCents, updated.condition, updated.availableFrom, updated.availableUntil,
+            updated.illustration, updated.color];
+          const saved = await row<{ id: number }>(`UPDATE listings SET title=$1,description=$2,university=$3,category=$4,
+            "priceCents"=$5,condition=$6,"availableFrom"=$7,"availableUntil"=$8,illustration=$9,color=$10${imageColumns}
+            WHERE id=$${image ? 13 : 11} AND "sellerId"=$${image ? 14 : 12} RETURNING id`,
+            ...values, ...(image ? [image.data, image.mime] : []), id, user.id);
+          if (!saved) throw new HttpError(404, "Item not found.");
+        } else {
+          if (typeof data.status !== "string" || !["available", "reserved", "sold"].includes(data.status)) throw new HttpError(400, "Choose a valid status.");
+          await rows("UPDATE listings SET status=$1 WHERE id=$2 AND \"sellerId\"=$3", String(data.status), id, user.id);
+        }
         return json({ listing: await getListing(id) });
       }
     }
