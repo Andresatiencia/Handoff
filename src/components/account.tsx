@@ -36,7 +36,7 @@ export function Account() {
 
   return <main className="page-width py-16"><div className="mx-auto max-w-lg">
     
-    <h1 className="mt-3 text-4xl font-semibold">{user ? `Hi, ${user.name}.` : register ? "Start your next chapter." : "Welcome back."}</h1>
+    <h1 className="display-lg mt-3">{user ? `Hi, ${user.name}.` : register ? "Start your next chapter." : "Welcome back."}</h1>
     {loading ? <p className="mt-6">Loading account…</p> : user ? <section className="mt-8 space-y-5 rounded-3xl border border-ink/10 bg-white p-8"><p className="break-words">{user.email}</p><p className="text-sm text-muted">{user.university}</p><Link className="button-primary" href="/marketplace?mine=true">Manage my listings</Link><button disabled={busy} onClick={logout} className="button-secondary ml-2">Sign out</button></section> : <form onSubmit={submit} className="mt-8 space-y-5 rounded-3xl border border-ink/10 bg-white p-8">
       {register && <><label className="block text-sm font-semibold">Your name<input name="name" autoComplete="name" required maxLength={60} className="form-input mt-2" /></label><UniversitySelect /></>}
       <label className="block text-sm font-semibold">Email<input type="email" name="email" autoComplete="email" required maxLength={254} className="form-input mt-2" /></label>

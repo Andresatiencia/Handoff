@@ -18,6 +18,6 @@ export function AccountGate({ next, children }: { next: string; children: React.
   const { user, loading, error, refresh } = useAuth();
   if (loading) return <p className="page-width py-16" role="status">Checking your account…</p>;
   if (error) return <div className="page-width py-16"><p role="alert">{error}</p><button onClick={refresh} className="button-secondary mt-4">Try again</button></div>;
-  if (!user) return <main className="page-width py-16"><div className="mx-auto max-w-lg rounded-3xl border border-ink/10 bg-white p-8"><h1 className="text-3xl font-semibold">Make your next handoff.</h1><p className="my-5 leading-7 text-muted">Sign in or create an account to post items and send private messages to other students.</p><Link href={`/account?next=${encodeURIComponent(next)}`} className="button-primary">Sign in or create account</Link></div></main>;
+  if (!user) return <main className="page-width py-16"><div className="mx-auto max-w-lg rounded-3xl border border-ink/10 bg-white p-8"><h1 className="display-lg">Make your next handoff.</h1><p className="my-5 leading-7 text-muted">Sign in or create an account to post items and send private messages to other students.</p><Link href={`/account?next=${encodeURIComponent(next)}`} className="button-primary">Sign in or create account</Link></div></main>;
   return children;
 }
