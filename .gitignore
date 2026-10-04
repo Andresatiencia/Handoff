@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.vercel/
 out/
 *.tsbuildinfo
 next-env.d.ts
@@ -9,3 +10,4 @@ data/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+.vercel

@@ -43,7 +43,6 @@ const schema = `
     CREATE INDEX IF NOT EXISTS listings_seller ON listings(sellerId);
     CREATE INDEX IF NOT EXISTS conversations_buyer ON conversations(buyerId);
     CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, resetsAt INTEGER NOT NULL);
-    PRAGMA user_version = 1;
   `;
 
 async function connect() {
