@@ -15,14 +15,14 @@ Open http://localhost:3000. No cloud account, API keys, database installation, o
 
 Use the same host and port in the browser and in `APP_ORIGIN` when that variable is set. The API compares write requests with this exact origin; mixing `localhost` and `127.0.0.1` can return “Request origin is not allowed.” For a review with a separate local database, start the server with `APP_ORIGIN=http://127.0.0.1:3000`, `HANDOFF_DB_PATH=data/handoff-review.sqlite`, and empty `DATABASE_URL`, `TURSO_DATABASE_URL`, and `TURSO_AUTH_TOKEN`, then use only `http://127.0.0.1:3000` in the browser. Keep the origin check enabled.
 
-Create an account at **Sign in → Create account**, verify it using the link printed in the local server console, then post your first item. The live marketplace starts empty; old mock listings and browser-only conversations are not imported because they have no verified account owner. Landing-page illustrations are decorative examples.
+Create an account at **Sign in → Create account**, then post your first item. No email verification or mail provider is required. The live marketplace starts empty; old mock listings and browser-only conversations are not imported because they have no account owner. Landing-page illustrations are decorative examples.
 
 The Hands design uses illustrative cutout objects on the home page; marketplace cards serve each listing's actual uploaded photo when one exists. The `public/brand` fonts carry their OFL licenses, and the illustrative WebP files carry source notes.
 
 ## Try a real handoff
 
-1. Create and verify a seller account in your normal browser. Post an item with its availability dates and an optional product photo.
-2. Open an incognito window or a second browser and create and verify a buyer account.
+1. Create a seller account in your normal browser. Post an item with its availability dates and an optional product photo.
+2. Open an incognito window or a second browser and create a buyer account.
 3. Browse the marketplace and choose **Message seller**. Send a message.
 4. In the seller's browser, open **Messages** and reply. Messages refresh every three seconds.
 5. Each buyer has a separate private conversation with the seller.
@@ -35,7 +35,7 @@ Both browsers must access the **same running Handoff server**. Different localho
 Bundles: Sellers can open **Create a bundle** from the marketplace, group 2–12 named items with conditions and an availability window, and enter a bundle price and estimated new cost. Arriving students can add specific needs on the arrival form; cards calculate coverage, timing, and estimated savings. A signed-in buyer can reserve a whole bundle in one action. The five labeled demo bundles have personal demo reservations and do not arrange pickup; a bundle posted by a real account can be reserved by only one buyer.
 
 - Registration, sign-in, sign-out, seven-day server-side sessions, and account ownership.
-- Google Sign-In and email/password accounts share Handoff users and sessions. A successful Google sign-in verifies the account email. When Resend is configured, password accounts receive a 24-hour, single-use verification link. Unverified accounts, including older accounts with unknown mailbox ownership, can browse but cannot post, claim, or send messages.
+- Google Sign-In and email/password accounts share Handoff users and sessions. Signed-in users can post, claim, and message without email verification. Older password accounts retain their profiles and gain the same access.
 - Salted scrypt password hashes and random session tokens stored as SHA-256 hashes; HttpOnly, SameSite cookies, with Secure cookies when the configured origin uses HTTPS.
 - Persistent shared listings, seller status management and deletion, server validation, product photos, and prices stored as integer cents. The price form accepts at most two decimal places.
 - Seller-created bundles and database-backed reservations. Bundle matches and savings use entered items, needs, dates, and estimated retail values; no payment is collected.
@@ -50,19 +50,15 @@ Selecting a university is self-reported affiliation; it does not verify enrollme
 
 ## Configuration and hosting
 
-### Email verification
-
-To activate password-account email verification, verify a sending domain in [Resend](https://resend.com/docs/dashboard/domains/introduction), then set both `RESEND_API_KEY` and `HANDOFF_EMAIL_FROM` in the Vercel project's environment variables. Example sender: `Handoff <verify@your-domain.example>`. Redeploy after adding them. The server calls Resend's email API directly; no package is required. Do not put the API key in a `NEXT_PUBLIC_` variable or commit it. Without both settings, password accounts can still register and browse, but cannot post, claim, or message until their email is verified through Resend or Google. Older accounts marked `legacy` are likewise unverified.
-
 ### Google Sign-In
 
 Create an OAuth 2.0 **Web application** client in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) and configure its OAuth consent screen. Add `https://handoff-opal.vercel.app/api/auth/google/callback` as an **Authorized redirect URI**. If the consent screen is in Testing, add each hackathon participant as a test user; publishing the consent screen allows other Google accounts within Google's applicable limits. Request only `openid`, `email`, and `profile` scopes.
 
 In Vercel's Handoff project, add `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `APP_ORIGIN=https://handoff-opal.vercel.app` to the **Production** environment, then redeploy. Add the same values to Preview only if you also register that preview site's exact callback URL; a fixed production `APP_ORIGIN` intentionally rejects sign-in from a different host. For local testing, register `http://localhost:3000/api/auth/google/callback` as a second redirect URI and use `APP_ORIGIN=http://localhost:3000` with the same Google client credentials in the ignored `.env.local` file. Never use `NEXT_PUBLIC_` for the client secret.
 
-Google uses the authorization-code flow with PKCE, state, nonce, and a server-verified ID token. Only Gmail and Google Workspace addresses are accepted for verified status, because Google cannot guarantee ongoing ownership of third-party mailbox addresses. Its stable account ID is stored on the existing user record; Handoff issues its existing seven-day session cookie. A password account with the same email must first sign in with its password and use **Connect Google** on the account page. This prevents a Google login from silently taking over a preexisting account. Once linked, either method signs in to the same user and their listings and messages remain attached.
+Google uses the authorization-code flow with PKCE, state, nonce, and a server-verified ID token. Only Gmail and Google Workspace addresses are accepted for Google Sign-In, because Google cannot guarantee ongoing ownership of third-party mailbox addresses. Its stable account ID is stored on the existing user record; Handoff issues its existing seven-day session cookie. A password account with the same email must first sign in with its password and use **Connect Google** on the account page. This prevents a Google login from silently taking over a preexisting account. Once linked, either method signs in to the same user and their listings and messages remain attached.
 
-During local `npm run dev`, verification links are written to the server console if Resend is not configured. This is a local development aid only. The link expires after 24 hours and can be used once. Users can request a replacement from their account page; this invalidates the previous link. Opening the link presents a confirmation button so email previewers do not verify accounts merely by loading the URL. Confirming ownership proves access to the mailbox at that moment, not that the mailbox will remain active forever.
+Handoff no longer sends email verification links. Previously saved verification data stays in existing databases but is not used for access decisions. The app does not prove ownership of an email address; account recovery by email should not be added until verification is restored. Existing `RESEND_API_KEY` and `HANDOFF_EMAIL_FROM` settings are unused and can be removed from Vercel.
 
 Bundle claims reserve the grouped items in Handoff. Pickup coordination for bundles is not yet integrated with item messaging. Estimated new costs are seller-entered, and arrival needs travel in the marketplace URL rather than an account profile.
 
@@ -121,11 +117,10 @@ Integration tests require an existing production build. They launch isolated ser
 - `src/components/account.tsx`, `sell-form.tsx`, `marketplace.tsx`, `messages.tsx`: live application flows.
 - `tests/backend.test.mjs`: end-to-end API integration tests.
 
-Routes: `/`, `/account`, `/verify-email`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/bundles/new`, `/bundles/:id`, `/messages`.
+Routes: `/`, `/account`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/bundles/new`, `/bundles/:id`, `/messages`. Old `/verify-email` links redirect to `/account`.
 
 API:
 - `GET /api/auth/me`; `POST /api/auth/register|login|logout`.
-- `POST /api/auth/resend-verification`; `POST /api/auth/verify-email`.
 - `GET/POST /api/listings`; `GET/PATCH/DELETE /api/listings/:id` (PATCH changes status; DELETE is seller-only); `GET /api/listings/:id/image`.
 - `GET/POST /api/bundles`; `GET /api/bundles/:id`; `POST /api/bundles/:id/claim`.
 - `GET/POST /api/conversations`.

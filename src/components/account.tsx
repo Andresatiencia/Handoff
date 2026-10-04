@@ -8,7 +8,6 @@ import type { User } from "@/lib/contracts";
 import { useAuth } from "./auth-provider";
 import { UniversitySelect } from "./university-select";
 import { FlowIntro } from "./flow-intro";
-import { VerifyEmailPrompt } from "./verify-email-prompt";
 
 export function Account({ googleEnabled }: { googleEnabled: boolean }) {
   const { user, loading, error: authError, refresh } = useAuth();
@@ -26,12 +25,9 @@ export function Account({ googleEnabled }: { googleEnabled: boolean }) {
     event.preventDefault(); setError(""); setBusy(true);
     const fields = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      const result = await api<{ user: User; emailSent?: boolean; emailError?: string }>(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify(fields) });
+      await api<{ user: User }>(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify(fields) });
       refresh();
-      if (result.user.emailVerificationRequired) {
-        if (result.emailSent === false) setError(result.emailError ?? "We could not send the verification email. Use the resend button below to try again.");
-        router.push("/account");
-      } else router.push(next);
+      router.push(next);
     } catch (error) { setError(error instanceof Error ? error.message : "Could not sign in."); }
     finally { setBusy(false); }
   }
@@ -44,11 +40,10 @@ export function Account({ googleEnabled }: { googleEnabled: boolean }) {
   }
 
   return <main className="page-width task-page py-10 sm:py-16"><div className="flow-layout">
-    <FlowIntro title={user ? `Hi, ${user.name}.` : register ? "Start your next chapter." : "Welcome back."} description={user?.emailVerificationRequired ? "One more step before your next handoff. Confirm your email, then post and message students." : user ? "Your essentials, your conversations and your next handoff. All in one place." : "Join the students passing good things on. Your next handoff starts here."} />
+    <FlowIntro title={user ? `Hi, ${user.name}.` : register ? "Start your next chapter." : "Welcome back."} description={user ? "Your essentials, your conversations and your next handoff. All in one place." : "Join the students passing good things on. Your next handoff starts here."} />
     <div>{loading ? <p role="status" className="form-panel">Loading account…</p> : user ? <div className="space-y-5">
-      {user.emailVerificationRequired && <VerifyEmailPrompt email={user.email} />}
-      {googleEnabled && <Link href={googleLink} className="button-secondary w-full text-center">{user.emailVerificationRequired ? "Verify with Google" : "Connect Google"}</Link>}
-      <section className="form-panel space-y-5"><h2>Your account</h2><p className="break-words">{user.email}</p><p className="text-sm text-muted">{user.university}</p><div className="account-actions">{user.emailVerificationRequired ? <Link className="button-secondary" href="/marketplace">Explore marketplace</Link> : <><Link className="button-primary" href="/marketplace?mine=true">Manage my listings</Link><Link className="button-secondary" href="/messages">Your messages</Link><Link className="button-secondary" href="/sell">Post an item</Link></>}<button disabled={busy} onClick={logout} className="text-link">{busy ? "Signing out…" : "Sign out"}</button></div></section>
+      {googleEnabled && <Link href={googleLink} className="button-secondary w-full text-center">Connect Google</Link>}
+      <section className="form-panel space-y-5"><h2>Your account</h2><p className="break-words">{user.email}</p><p className="text-sm text-muted">{user.university}</p><div className="account-actions"><Link className="button-primary" href="/marketplace?mine=true">Manage my listings</Link><Link className="button-secondary" href="/messages">Your messages</Link><Link className="button-secondary" href="/sell">Post an item</Link><button disabled={busy} onClick={logout} className="text-link">{busy ? "Signing out…" : "Sign out"}</button></div></section>
     </div> : <form onSubmit={submit} className="form-panel space-y-5">
       <h2>{register ? "Create your account" : "Sign in"}</h2>
       {googleEnabled && <><Link href={googleLink} className="button-secondary w-full text-center">Continue with Google</Link><p className="text-center text-xs text-muted">or use your email and password</p></>}

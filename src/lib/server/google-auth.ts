@@ -76,7 +76,6 @@ export async function findGoogleUser(profile: GoogleProfile, linkingUserId: numb
       throw new HttpError(409, "This Google account does not match your Handoff account.");
     }
     await rows(`UPDATE users SET "googleSub"=$1,"emailVerifiedAt"=$2 WHERE id=$3`, profile.sub, new Date().toISOString(), current.id);
-    await rows(`DELETE FROM email_verifications WHERE "userId"=$1`, current.id);
     return current.id;
   }
   if (linked) {
