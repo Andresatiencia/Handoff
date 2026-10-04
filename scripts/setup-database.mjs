@@ -1,14 +1,9 @@
-import { db } from "../src/lib/server/db.ts";
+import { rows } from "../src/lib/server/db.ts";
 
 try {
-  const client = await db();
-  try {
-    await client.execute("SELECT id FROM users LIMIT 1");
-    console.info("Handoff database is ready. Existing accounts and listings were preserved.");
-  } finally {
-    client.close();
-  }
+  await rows("SELECT id FROM users LIMIT 1");
+  console.info("Handoff database is ready. Existing accounts and listings were preserved.");
 } catch {
-  console.error("Database setup failed. Check the connection URL and token, then retry.");
+  console.error("Database setup failed. Check the database connection settings, then retry.");
   process.exitCode = 1;
 }

@@ -29,7 +29,7 @@ test("Vercel rejects missing or unsafe hosted storage without creating a local d
     await new Promise(resolve => socket.close(resolve));
     const origin = `http://localhost:${port}`;
     const server = spawn(process.execPath, [resolve("node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", String(port)], {
-      env: { ...process.env, VERCEL: "1", TURSO_DATABASE_URL: config.url, TURSO_AUTH_TOKEN: config.token, HANDOFF_DB_PATH: database, APP_ORIGIN: origin },
+      env: { ...process.env, VERCEL: "1", DATABASE_URL: "", TURSO_DATABASE_URL: config.url, TURSO_AUTH_TOKEN: config.token, HANDOFF_DB_PATH: database, APP_ORIGIN: origin },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let output = "";

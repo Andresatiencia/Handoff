@@ -4,20 +4,20 @@ A working student marketplace for the University of Central Missouri, built with
 
 ## Run locally
 
-Use **Node.js 24 or newer**. The database adapter uses libSQL locally and Turso when hosted credentials are configured.
+Use **Node.js 24 or newer**. The database adapter uses SQLite locally, Neon Postgres on the connected Vercel project, and also supports Turso when its credentials are configured.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. No cloud account, API keys, database installation, or seed credentials are required for local development. Without Turso credentials, the server creates `data/handoff.sqlite` and its schema on the first database request. Existing local SQLite data remains readable by the new adapter.
+Open http://localhost:3000. No cloud account, API keys, database installation, or seed credentials are required for local development. Without hosted credentials, the server creates `data/handoff.sqlite` and its schema on the first database request. Existing local SQLite data remains readable by the adapter.
 
 Create an account at **Sign in → Create account**, then post your first item. The live marketplace starts empty; old mock listings and browser-only conversations are not imported because they have no verified account owner. Landing-page illustrations are decorative examples.
 
 ## Try a real handoff
 
-1. Create a seller account in your normal browser. Post an item with its availability dates.
+1. Create a seller account in your normal browser. Post an item with its availability dates and an optional product photo.
 2. Open an incognito window or a second browser and create a buyer account.
 3. Browse the marketplace and choose **Message seller**. Send a message.
 4. In the seller's browser, open **Messages** and reply. Messages refresh every three seconds.
@@ -30,7 +30,7 @@ Both browsers must access the **same running Handoff server**. Different localho
 
 - Registration, sign-in, sign-out, seven-day server-side sessions, and account ownership.
 - Salted scrypt password hashes and random session tokens stored as SHA-256 hashes; HttpOnly, SameSite cookies, with Secure cookies when the configured origin uses HTTPS.
-- Persistent shared listings, seller status management, server validation, and prices stored as integer cents.
+- Persistent shared listings, seller status management, server validation, product photos, and prices stored as integer cents.
 - Public browsing with category, search, status, university, and inclusive arrival-date filters.
 - Only University of Central Missouri is selectable; the API enforces this restriction.
 - Private per-buyer/per-listing conversations, sender identity from the session, and polling for new messages.
@@ -38,28 +38,28 @@ Both browsers must access the **same running Handoff server**. Different localho
 - Same-origin checks on writes, request-size limits, parameterized SQL, and participant/ownership checks.
 - Loading, empty, and error states. Failed writes do not display a success confirmation.
 
-Selecting a university is self-reported affiliation; it does not verify enrollment. Payments, image uploads, email verification, password recovery, notifications, moderation, and automatic claiming are not implemented. Sellers reserve and close listings manually; pickup arrangements happen in messages. These are follow-up features, not simulated backend behavior.
+Selecting a university is self-reported affiliation; it does not verify enrollment. Payments, email verification, password recovery, notifications, moderation, and automatic claiming are not implemented. Sellers reserve and close listings manually; pickup arrangements happen in messages. These are follow-up features, not simulated backend behavior.
 
 ## Configuration and hosting
 
 See `.env.example`. Local file configuration is optional:
 
 - `HANDOFF_DB_PATH`: database file location; defaults to `data/handoff.sqlite`.
+- `DATABASE_URL`: Neon Postgres connection string. The connected Vercel marketplace resource sets this automatically for production, preview, and development.
+- `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`: optional alternative hosted Turso connection. Neon takes precedence when both are configured.
 - `APP_ORIGIN`: exact public origin, such as `https://handoff.example.com` (no trailing slash). Set this when deploying behind an HTTPS reverse proxy. It controls write-origin checks and Secure session cookies.
 
-### Vercel with Turso
+### Vercel hosted database
 
-The account, listing, session, and messaging APIs support a persistent Turso database shared by Vercel function instances. The existing password hashing, ownership checks, and private conversations are retained.
+Handoff's Vercel project is connected to a Neon Postgres resource. The integration supplies `DATABASE_URL` to the server for production, preview, and development. Deploy the current branch; the first API request creates tables and indexes. Accounts, sessions, listings, product photos, and messages are stored in the hosted database and persist across deployments. Set `APP_ORIGIN` only if a reverse proxy requires a fixed public origin; otherwise write-origin checks use the incoming request's origin.
 
-1. In the Handoff Vercel project, open **Storage** and connect **Turso** from the Marketplace. Select the free plan if available; no paid plan is needed for this implementation.
-2. Confirm that `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are set in the project's server environment for the deployment being used. These are server secrets: do not prefix them with `NEXT_PUBLIC_` or commit real values.
-3. Set `APP_ORIGIN` to the site's exact public HTTPS origin, without a trailing slash. A preview deployment needs its own origin and a separate test database; avoid connecting preview builds to production accounts.
-4. Deploy the branch containing this adapter. The first database request creates the missing tables and indexes without deleting existing rows. To initialize explicitly before deploying, put the credentials in the ignored `.env.local` file and run `npm run db:setup`.
-5. Test registration in the published site, then sign in from a second browser and verify that the same accounts and listings remain accessible after a redeployment.
+Turso remains supported if `DATABASE_URL` is absent: set both `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` as server-only environment variables. Do not prefix database credentials with `NEXT_PUBLIC_` or commit real values. To initialize either hosted database explicitly before deploying, put its credentials in the ignored `.env.local` file and run `npm run db:setup`.
 
-The Vercel filesystem is never used for account storage. On Vercel, missing credentials, file URLs, or unencrypted database URLs return a 503 configuration error instead of silently using a temporary SQLite file. The landing page remains available. If only one Turso variable is set locally, the server also rejects that incomplete configuration.
+The Vercel filesystem is never used for account storage. On Vercel, missing credentials or unsafe Turso URLs return a 503 configuration error instead of silently using a temporary SQLite file. The landing page remains available. If only one Turso variable is set locally, the server also rejects that incomplete configuration.
 
-Local accounts are not automatically uploaded to Turso. If existing local data must be retained in the hosted database, arrange an explicit import before inviting users. Use Turso's backup and recovery facilities for hosted data rather than copying files from Vercel.
+Local accounts are not automatically uploaded to hosted storage. If existing local data must be retained online, arrange an explicit import before inviting users. Use the provider's backup and recovery facilities for hosted data rather than copying files from Vercel.
+
+Product photos accept JPEG, PNG, and WebP files up to 10 MB. The browser converts them to smaller JPEG images before posting; the API validates the image signature and limits storage to 750 KB per image. Images are stored with listings in the database. Listings without a photo show a category illustration.
 
 Production commands:
 
@@ -70,7 +70,7 @@ npm run start
 
 The Vercel configuration explicitly selects the Next.js framework and its `.next` build output. This overrides project settings left over from a generic `dist` deployment.
 
-For deployments using the local file adapter, run one Node server instance with a persistent local disk and HTTPS in front of it. Multiple independent replicas and ephemeral serverless disks require the hosted Turso configuration above.
+For deployments using the local file adapter, run one Node server instance with a persistent local disk and HTTPS in front of it. Multiple independent replicas and ephemeral serverless disks require hosted Postgres or Turso.
 
 Keep the database outside publicly served folders and source control. Back up the database regularly; for a simple consistent backup, stop the server and copy the entire database directory (including any SQLite sidecar files), then restart it. Sessions and private messages are stored in that database.
 
@@ -88,7 +88,8 @@ Integration tests require an existing production build. They launch isolated ser
 ## Structure
 
 - `src/app/api/[...path]/route.ts`: HTTP API and authorization.
-- `src/lib/server/`: SQLite schema, authentication, validation, listing queries.
+- `src/lib/server/`: SQLite, Neon, and Turso schema and queries, authentication, and validation.
+- `src/lib/photo.ts`: browser-side photo resizing for listing posts.
 - `src/lib/api-client.ts`: client requests and polling.
 - `src/lib/contracts.ts`: shared API types.
 - `src/lib/universities.ts`: supported university list.
@@ -100,10 +101,10 @@ Routes: `/`, `/account`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/mes
 
 API:
 - `GET /api/auth/me`; `POST /api/auth/register|login|logout`.
-- `GET/POST /api/listings`; `GET/PATCH /api/listings/:id` (PATCH changes status).
+- `GET/POST /api/listings`; `GET/PATCH /api/listings/:id` (PATCH changes status); `GET /api/listings/:id/image`.
 - `GET/POST /api/conversations`.
 - `GET/POST /api/conversations/:id/messages`.
 
-Write requests require JSON and an Origin header matching the app origin. Cookies identify the account. `@libsql/client` is the database SDK used for both local SQLite and hosted Turso queries.
+Write requests require JSON and an Origin header matching the app origin. Cookies identify the account. Hosted queries use `@neondatabase/serverless` or `@libsql/client`.
 
-Reference APIs: [libSQL client](https://tursodatabase.github.io/libsql-client-ts/), [Turso on Vercel](https://vercel.com/marketplace/tursocloud/database), [Next.js route handlers](https://nextjs.org/docs/app/api-reference/file-conventions/route).
+Reference APIs: [Neon serverless driver](https://neon.com/docs/serverless/serverless-driver), [libSQL client](https://tursodatabase.github.io/libsql-client-ts/), [Next.js route handlers](https://nextjs.org/docs/app/api-reference/file-conventions/route).

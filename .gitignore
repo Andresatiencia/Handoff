@@ -10,4 +10,3 @@ data/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
-.vercel

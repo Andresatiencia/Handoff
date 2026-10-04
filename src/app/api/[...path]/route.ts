@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { execute, queryOne, queryAll, StorageUnavailable } from "@/lib/server/db";
+import { row, rows, StorageUnavailable } from "@/lib/server/db";
 import { currentUser, requireUser, passwordHash, verifyPassword, startSession, endSession, limit } from "@/lib/server/auth";
 import { HttpError, text, date, university, listingInput } from "@/lib/server/validation";
 import { getListing, listingSelect } from "@/lib/server/listings";
@@ -9,11 +9,11 @@ import type { Conversation, User } from "@/lib/contracts";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const json = (data: unknown, status = 200) => NextResponse.json(data, { status, headers: { "Cache-Control": "no-store" } });
-const conversationSelect = `SELECT c.id,c.listingId,c.buyerId,l.sellerId,l.title,l.status,
-  b.name AS buyerName,s.name AS sellerName FROM conversations c JOIN listings l ON l.id=c.listingId
-  JOIN users b ON b.id=c.buyerId JOIN users s ON s.id=l.sellerId`;
+const conversationSelect = `SELECT c.id,c."listingId",c."buyerId",l."sellerId",l.title,l.status,
+  b.name AS "buyerName",s.name AS "sellerName" FROM conversations c JOIN listings l ON l.id=c."listingId"
+  JOIN users b ON b.id=c."buyerId" JOIN users s ON s.id=l."sellerId"`;
 
-async function body(request: NextRequest) {
+async function body(request: NextRequest, maxSize = 16384) {
   if (!request.headers.get("content-type")?.includes("application/json")) throw new HttpError(415, "Send JSON data.");
   const reader = request.body?.getReader();
   if (!reader) throw new HttpError(400, "Missing request body.");
@@ -23,20 +23,39 @@ async function body(request: NextRequest) {
     const { value, done } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 16384) { await reader.cancel(); throw new HttpError(413, "Request is too large."); }
+    if (size > maxSize) { await reader.cancel(); throw new HttpError(413, "Request is too large."); }
     chunks.push(value);
   }
   try {
     const value = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+    if (size > 16384 && !("image" in value)) throw new HttpError(413, "Request is too large.");
     return value as Record<string, unknown>;
-  } catch { throw new HttpError(400, "Invalid JSON data."); }
+  } catch (error) { if (error instanceof HttpError) throw error; throw new HttpError(400, "Invalid JSON data."); }
 }
 
 async function conversation(id: number, userId: number) {
-  const item = await queryOne<Conversation>(`${conversationSelect} WHERE c.id=? AND (c.buyerId=? OR l.sellerId=?)`, [id, userId, userId]);
+  const item = await row<Conversation>(`${conversationSelect} WHERE c.id=$1 AND (c."buyerId"=$2 OR l."sellerId"=$3)`, id, userId, userId);
   if (!item) throw new HttpError(404, "Conversation not found.");
   return item;
+}
+
+function imageInput(value: unknown) {
+  if (value === undefined || value === null) return { data: null, mime: null };
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new HttpError(400, "Choose a valid product photo.");
+  const image = value as Record<string, unknown>;
+  if (typeof image.data !== "string" || typeof image.mime !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(image.data)) {
+    throw new HttpError(400, "Choose a JPEG, PNG, or WebP photo.");
+  }
+  const bytes = Buffer.from(image.data, "base64");
+  if (!bytes.length || bytes.length > 750_000 || bytes.toString("base64") !== image.data) throw new HttpError(400, "Photo must be 750 KB or smaller.");
+  const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const webp = bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP";
+  if (!((image.mime === "image/jpeg" && jpeg) || (image.mime === "image/png" && png) || (image.mime === "image/webp" && webp))) {
+    throw new HttpError(400, "Choose a JPEG, PNG, or WebP photo.");
+  }
+  return { data: image.data, mime: image.mime };
 }
 
 async function handle(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
@@ -70,14 +89,14 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
         const campus = university(data.university);
         const hash = await passwordHash(data.password);
         try {
-          const result = await execute("INSERT INTO users(name,email,passwordHash,university) VALUES(?,?,?,?)", [name, email, hash, campus]);
-          user = { id: Number(result.lastInsertRowid), name, email, university: campus };
+          const result = await row<{ id: number }>("INSERT INTO users(name,email,\"passwordHash\",university) VALUES($1,$2,$3,$4) RETURNING id", name, email, hash, campus);
+          user = { id: Number(result!.id), name, email, university: campus };
         } catch (error) {
-          if (String(error).includes("UNIQUE")) throw new HttpError(409, "An account with this email already exists. Sign in instead.");
+          if (String(error).toLowerCase().includes("unique") || (error as { code?: string }).code === "23505") throw new HttpError(409, "An account with this email already exists. Sign in instead.");
           throw error;
         }
       } else {
-        const account = await queryOne<User & { passwordHash: string }>("SELECT * FROM users WHERE email=?", [email]);
+        const account = await row<User & { passwordHash: string }>("SELECT * FROM users WHERE email=$1", email);
         // Perform the same password work for unknown addresses.
         const fallback = `00000000000000000000000000000000:${"00".repeat(64)}`;
         const valid = await verifyPassword(data.password, account?.passwordHash ?? fallback);
@@ -91,25 +110,34 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       const params = request.nextUrl.searchParams;
       const clauses: string[] = [];
       const values: (string | number)[] = [];
-      if (params.get("mine") === "true") { clauses.push("l.sellerId=?"); values.push((await requireUser(request)).id); }
-      if (params.get("university")) { clauses.push("l.university=?"); values.push(university(params.get("university"))); }
-      if (params.get("arrival")) { const arrival = date(params.get("arrival")); clauses.push("l.availableFrom<=? AND l.availableUntil>=?"); values.push(arrival, arrival); }
+      if (params.get("mine") === "true") { clauses.push(`l."sellerId"=$${values.length + 1}`); values.push((await requireUser(request)).id); }
+      if (params.get("university")) { clauses.push(`l.university=$${values.length + 1}`); values.push(university(params.get("university"))); }
+      if (params.get("arrival")) { const arrival = date(params.get("arrival")); clauses.push(`l."availableFrom"<=$${values.length + 1} AND l."availableUntil">=$${values.length + 2}`); values.push(arrival, arrival); }
       if (params.get("available") === "true") clauses.push("l.status='available'");
-      if (params.get("q")) { clauses.push("instr(lower(l.title),lower(?))>0"); values.push(text(params.get("q"), "Search", 100)); }
+      if (params.get("q")) { clauses.push(`lower(l.title) LIKE $${values.length + 1} ESCAPE '\\'`); values.push(`%${text(params.get("q"), "Search", 100).toLowerCase().replace(/[\\%_]/g, "\\$&")}%`); }
       if (params.get("categories")) {
         const selected = params.get("categories")!.split(",");
         if (selected.length > categories.length || !selected.every(value => categories.includes(value as typeof categories[number]))) throw new HttpError(400, "Invalid category.");
-        clauses.push(`l.category IN (${selected.map(() => "?").join(",")})`); values.push(...selected);
+        clauses.push(`l.category IN (${selected.map((_, index) => `$${values.length + index + 1}`).join(",")})`); values.push(...selected);
       }
-      const rows = await queryAll(`${listingSelect}${clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""} ORDER BY l.id DESC LIMIT 200`, values);
-      return json({ listings: rows });
+      const listings = await rows(`${listingSelect}${clauses.length ? ` WHERE ${clauses.join(" AND ")}` : ""} ORDER BY l.id DESC LIMIT 200`, ...values);
+      return json({ listings });
     }
     if (route === "listings" && method === "POST") {
       const user = await requireUser(request); await limit(`post:${user.id}`, 30, 3600000);
-      const data = listingInput(await body(request));
-      const result = await execute(`INSERT INTO listings(sellerId,title,description,university,category,priceCents,condition,availableFrom,availableUntil,illustration,color)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?)`, [user.id, data.title, data.description, data.university, data.category, data.priceCents, data.condition, data.availableFrom, data.availableUntil, data.illustration, data.color]);
-      return json({ listing: await getListing(Number(result.lastInsertRowid)) }, 201);
+      const input = await body(request, 1_100_000);
+      const data = listingInput(input);
+      const image = imageInput(input.image);
+      const result = await row<{ id: number }>(`INSERT INTO listings("sellerId",title,description,university,category,"priceCents",condition,"availableFrom","availableUntil",illustration,color,"imageData","imageMime")
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`, user.id, data.title, data.description, data.university, data.category, data.priceCents, data.condition, data.availableFrom, data.availableUntil, data.illustration, data.color, image.data, image.mime);
+      return json({ listing: await getListing(Number(result!.id)) }, 201);
+    }
+    if (parts[0] === "listings" && parts.length === 3 && /^\d+$/.test(parts[1]) && parts[2] === "image" && method === "GET") {
+      const image = await row<{ imageData: string | null; imageMime: string | null }>(`SELECT "imageData","imageMime" FROM listings WHERE id=$1`, Number(parts[1]));
+      if (!image?.imageData || !image.imageMime) throw new HttpError(404, "Photo not found.");
+      return new NextResponse(Buffer.from(image.imageData, "base64"), {
+        headers: { "Content-Type": image.imageMime, "Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff" },
+      });
     }
     if (parts[0] === "listings" && parts.length === 2 && /^\d+$/.test(parts[1])) {
       const id = Number(parts[1]);
@@ -121,13 +149,13 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
         if (listing.sellerId !== user.id) throw new HttpError(403, "Only the seller can change this listing.");
         const data = await body(request);
         if (typeof data.status !== "string" || !["available", "reserved", "sold"].includes(data.status)) throw new HttpError(400, "Choose a valid status.");
-        await execute("UPDATE listings SET status=? WHERE id=? AND sellerId=?", [String(data.status), id, user.id]);
+        await rows("UPDATE listings SET status=$1 WHERE id=$2 AND \"sellerId\"=$3", String(data.status), id, user.id);
         return json({ listing: await getListing(id) });
       }
     }
     if (route === "conversations" && method === "GET") {
       const user = await requireUser(request);
-      return json({ conversations: await queryAll(`${conversationSelect} WHERE c.buyerId=? OR l.sellerId=? ORDER BY c.id DESC`, [user.id, user.id]) });
+      return json({ conversations: await rows(`${conversationSelect} WHERE c."buyerId"=$1 OR l."sellerId"=$2 ORDER BY c.id DESC`, user.id, user.id) });
     }
     if (route === "conversations" && method === "POST") {
       const user = await requireUser(request); await limit(`conversation:${user.id}`, 60, 3600000);
@@ -136,27 +164,26 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       const listing = await getListing(Number(data.listingId));
       if (!listing) throw new HttpError(404, "Item not found.");
       if (listing.sellerId === user.id) throw new HttpError(400, "This is your listing. Open Messages to reply to interested buyers.");
-      const existing = await queryOne<{ id: number }>("SELECT id FROM conversations WHERE listingId=? AND buyerId=?", [listing.id, user.id]);
+      const existing = await row<{ id: number }>(`SELECT id FROM conversations WHERE "listingId"=$1 AND "buyerId"=$2`, listing.id, user.id);
       if (existing) return json({ conversation: await conversation(existing.id, user.id) });
       if (listing.status !== "available") throw new HttpError(409, "This item is no longer available. Existing conversations remain open.");
-      await execute("INSERT OR IGNORE INTO conversations(listingId,buyerId) VALUES(?,?)", [listing.id, user.id]);
-      const row = await queryOne<{ id: number }>("SELECT id FROM conversations WHERE listingId=? AND buyerId=?", [listing.id, user.id]);
-      return json({ conversation: await conversation(row!.id, user.id) }, 201);
+      await rows(`INSERT INTO conversations("listingId","buyerId") VALUES($1,$2) ON CONFLICT("listingId","buyerId") DO NOTHING`, listing.id, user.id);
+      const created = await row<{ id: number }>(`SELECT id FROM conversations WHERE "listingId"=$1 AND "buyerId"=$2`, listing.id, user.id);
+      return json({ conversation: await conversation(created!.id, user.id) }, 201);
     }
     if (parts[0] === "conversations" && /^\d+$/.test(parts[1] ?? "") && parts[2] === "messages" && parts.length === 3) {
       const user = await requireUser(request);
       const thread = await conversation(Number(parts[1]), user.id);
       if (method === "GET") {
-        return json({ conversation: thread, messages: await queryAll(`SELECT m.id,m.conversationId,m.senderId,m.text,m.createdAt,u.name AS senderName
-          FROM messages m JOIN users u ON u.id=m.senderId WHERE m.conversationId=? ORDER BY m.id`, [thread.id]) });
+        return json({ conversation: thread, messages: await rows(`SELECT m.id,m."conversationId",m."senderId",m.text,m."createdAt",u.name AS "senderName"
+          FROM messages m JOIN users u ON u.id=m."senderId" WHERE m."conversationId"=$1 ORDER BY m.id`, thread.id) });
       }
       if (method === "POST") {
         await limit(`message:${user.id}`, 60, 60000);
         const data = await body(request);
         const content = text(data.text, "Message", 2000);
-        const result = await execute("INSERT INTO messages(conversationId,senderId,text,createdAt) VALUES(?,?,?,?)",
-          [thread.id, user.id, content, new Date().toISOString()]);
-        return json({ id: Number(result.lastInsertRowid) }, 201);
+        const result = await row<{ id: number }>(`INSERT INTO messages("conversationId","senderId",text,"createdAt") VALUES($1,$2,$3,$4) RETURNING id`, thread.id, user.id, content, new Date().toISOString());
+        return json({ id: Number(result!.id) }, 201);
       }
     }
     throw new HttpError(404, "Endpoint not found.");

@@ -21,7 +21,7 @@ test("real server: accounts, listings, private messages, and restart persistence
   let output = "";
   async function start() {
     processHandle = spawn(process.execPath, [resolve("node_modules/next/dist/bin/next"), "start", "--port", String(port)], {
-      env: { ...process.env, VERCEL: "", TURSO_DATABASE_URL: "", TURSO_AUTH_TOKEN: "", HANDOFF_DB_PATH: database, APP_ORIGIN: origin }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+      env: { ...process.env, VERCEL: "", DATABASE_URL: "", TURSO_DATABASE_URL: "", TURSO_AUTH_TOKEN: "", HANDOFF_DB_PATH: database, APP_ORIGIN: origin }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
     });
     processHandle.stdout.on("data", chunk => { output += chunk; });
     processHandle.stderr.on("data", chunk => { output += chunk; });
@@ -145,6 +145,20 @@ test("real server: accounts, listings, private messages, and restart persistence
     await fourth("auth/register", "POST", { name: "Late buyer", email: "fourth@example.com", password, university: campus });
     assert.equal((await fourth("conversations", "POST", { listingId })).status, 409);
     assert.equal((await buyer("conversations", "POST", { listingId })).data.conversation.id, threadId);
+  });
+
+  await t.test("uploaded photos are validated, served, and kept with listings", async () => {
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");
+    assert.equal((await seller("listings", "POST", { ...item, image: { mime: "image/jpeg", data: png.toString("base64") } })).status, 400);
+    const created = await seller("listings", "POST", { ...item, title: "Photo listing", image: { mime: "image/png", data: png.toString("base64") } });
+    assert.equal(created.status, 201);
+    assert.equal(created.data.listing.hasImage, 1);
+    const imageId = created.data.listing.id;
+    const image = await fetch(`${origin}/api/listings/${imageId}/image`);
+    assert.equal(image.status, 200);
+    assert.equal(image.headers.get("content-type"), "image/png");
+    assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
+    assert.equal((await seller(`listings/${imageId}`, "PATCH", { status: "sold" })).status, 200);
   });
 
   await t.test("CSRF, request size, password checks, and logout are enforced", async () => {
