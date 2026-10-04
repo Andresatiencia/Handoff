@@ -1,26 +1,103 @@
 @import "tailwindcss";
+
 @theme inline {
+  /* Palette is fixed — unchanged from the original identity. */
   --color-cream: #faf9f5;
   --color-forest: #285747;
   --color-ink: #233d32;
   --color-muted: #69736b;
   --color-amber: #9c6b16;
   --color-sand: #f0f1e9;
-  --font-sans: Arial, Helvetica, sans-serif;
+
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-display-face), Georgia, "Times New Roman", serif;
 }
+
+:root {
+  /* The built-in CSS easings are too weak to read as intentional. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --press: 160ms;
+  --rule: color-mix(in srgb, var(--color-ink) 12%, transparent);
+}
+
 html { scroll-behavior: smooth; }
-body { background: var(--color-cream); color: var(--color-ink); font-family: Arial, Helvetica, sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
-button, a, input { -webkit-tap-highlight-color: transparent; }
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 ::selection { background: #dbe6ca; }
-:focus-visible { outline: 3px solid #9c6b16; outline-offset: 4px; }
-label:has(input:focus-visible) { outline: 3px solid #9c6b16; outline-offset: 4px; border-radius: 12px; }
-@layer components {
-  .page-width { @apply mx-auto w-full max-w-6xl px-5 sm:px-8; }
-  .nav-link { @apply text-sm font-medium text-muted transition hover:text-forest; }
-  .eyebrow { @apply text-xs font-semibold text-muted; }
-  .button-primary { @apply inline-flex min-h-12 items-center justify-center gap-3 rounded-xl bg-forest px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4437] hover:shadow-md; }
-  .button-secondary { @apply inline-flex min-h-12 items-center justify-center gap-3 rounded-xl border border-forest/25 bg-white px-6 py-3 text-sm font-semibold text-forest transition hover:bg-sand; }
-  .form-input { @apply block min-h-12 w-full rounded-xl border border-ink/20 bg-cream px-4 py-3 text-base font-normal text-ink; }
+:focus-visible { outline: 2px solid var(--color-amber); outline-offset: 3px; border-radius: 3px; }
+label:has(input:focus-visible), label:has(select:focus-visible), label:has(textarea:focus-visible) {
+  outline: 2px solid var(--color-amber); outline-offset: 3px; border-radius: 10px;
 }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { transition: none !important; } }
+
+@layer components {
+  .page-width { @apply mx-auto w-full max-w-5xl px-5 sm:px-8; }
+
+  /* Display face carries the personality; it is never used below 20px. */
+  .display, .display-xl, .display-lg, .display-md, .display-sm {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.021em;
+  }
+  .display-xl { font-size: clamp(2.9rem, 7vw, 4.7rem); line-height: 0.97; }
+  .display-lg { font-size: clamp(2rem, 3.8vw, 2.9rem); line-height: 1.06; }
+  .display-md { font-size: clamp(1.4rem, 2.2vw, 1.85rem); line-height: 1.12; }
+  .display-sm { font-size: 1.1875rem; line-height: 1.22; }
+
+  .lede { @apply max-w-[44ch] text-[1.0625rem] leading-[1.7] text-muted; }
+  .label { @apply text-[0.8125rem] font-medium text-muted; }
+  .nav-link { @apply text-sm text-muted; transition: color 150ms var(--ease-out); }
+  .nav-link:hover { @apply text-forest; }
+  .rule { border-top: 1px solid var(--rule); }
+
+  .button-primary {
+    @apply inline-flex min-h-12 items-center justify-center rounded-full bg-forest px-7 text-sm font-medium text-white;
+    transition: transform var(--press) var(--ease-out), background-color var(--press) var(--ease-out);
+  }
+  .button-secondary {
+    @apply inline-flex min-h-12 items-center justify-center rounded-full border border-forest/25 bg-transparent px-7 text-sm font-medium text-forest;
+    transition: transform var(--press) var(--ease-out), background-color var(--press) var(--ease-out), border-color var(--press) var(--ease-out);
+  }
+  /* Instant feedback on press — the interface confirms it heard you. */
+  .button-primary:active, .button-secondary:active { transform: scale(0.97); }
+
+  .form-input {
+    @apply block min-h-12 w-full rounded-xl border border-ink/15 bg-white/70 px-4 py-3 text-base text-ink;
+    transition: border-color 150ms var(--ease-out), background-color 150ms var(--ease-out);
+  }
+  .form-input:focus { @apply bg-white; }
+}
+
+.listing-card { transition: transform 200ms var(--ease-out), border-color 200ms var(--ease-out); }
+
+/* Hover is a lie on touch devices. */
+@media (hover: hover) and (pointer: fine) {
+  .button-primary:hover { @apply bg-[#1d4437]; }
+  .button-secondary:hover { @apply bg-sand; }
+  .listing-card:hover { transform: translateY(-3px); @apply border-ink/20; }
+}
+
+/* Entrances, staggered. Decorative only — never gates interaction. */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise 420ms var(--ease-out) backwards; }
+
+/* Reduced motion means gentler, not none: colour and opacity still inform. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-property: opacity, background-color, border-color, color, fill !important;
+    transition-duration: 150ms !important;
+  }
+}

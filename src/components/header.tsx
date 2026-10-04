@@ -1,8 +1,26 @@
 "use client";
-import { useAuth } from "./auth-provider";
 import Link from "next/link";
-import { LogoMark } from "./icons";
+import { useAuth } from "./auth-provider";
+
 export function Header() {
   const { user } = useAuth();
-  return <header className="border-b border-ink/10"><div className="page-width flex min-h-21 flex-wrap items-center justify-between gap-4 py-4"><Link href="/" aria-label="Handoff home" className="flex items-center gap-2.5 text-2xl font-bold tracking-tight text-forest"><LogoMark />Handoff<span className="text-amber">.</span></Link><nav aria-label="Main navigation" className="flex flex-wrap items-center gap-3 sm:gap-6"><Link className="nav-link" href="/messages">Messages</Link><Link className="nav-link" href="/marketplace">Browse items</Link><Link className="hidden items-center gap-2 rounded-full border border-forest/25 px-5 py-2.5 text-sm font-semibold text-forest transition hover:bg-forest/5 sm:flex" href="/sell">Post an item</Link><Link href="/account" className="nav-link">{user ? "My account" : "Sign in"}</Link></nav></div></header>;
+  return <header className="border-b border-ink/10">
+    <div className="page-width flex flex-wrap items-center justify-between gap-x-6 gap-y-3 py-5">
+      <Link href="/" aria-label="Handoff home" className="display text-[1.6rem] leading-none text-forest">
+        Handoff<span className="text-amber">.</span>
+      </Link>
+      <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-5 sm:gap-7">
+        <Link className="nav-link" href="/marketplace">Browse</Link>
+        <Link className="nav-link" href="/messages">Messages</Link>
+        <Link className="nav-link" href="/account">{user ? "My account" : "Sign in"}</Link>
+        <Link
+          href="/sell"
+          className="inline-flex min-h-9 items-center rounded-full border border-forest/25 px-4 text-sm font-medium text-forest"
+          style={{ transition: "transform var(--press) var(--ease-out), background-color var(--press) var(--ease-out)" }}
+        >
+          Post an item
+        </Link>
+      </nav>
+    </div>
+  </header>;
 }

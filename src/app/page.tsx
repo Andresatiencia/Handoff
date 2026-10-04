@@ -1,7 +1,61 @@
 import Link from "next/link";
-import { Arrow } from "@/components/icons";
-import { ItemArt } from "@/components/item-art";
 import { RecentListings } from "@/components/recent-listings";
+
+const steps = [
+  { n: "01", title: "Share your timeline", text: "Leaving or arriving? Start with your campus and the date you move." },
+  { n: "02", title: "Find the everyday essentials", text: "A warm coat, a first kitchen, a desk lamp. See what other students are passing on." },
+  { n: "03", title: "Keep good things going", text: "Less waste at the end of term, less to buy at the start of one." },
+];
+
 export default function Home() {
-  return <main><section className="page-width grid items-center gap-12 pb-16 pt-12 lg:grid-cols-[1.08fr_1fr] lg:gap-16 lg:pb-20 lg:pt-20"><div><div className="mb-7 inline-flex items-center gap-2 rounded-full border border-forest/15 bg-sand px-3 py-1.5 text-[11px] font-semibold text-forest"><span className="h-1.5 w-1.5 rounded-full bg-forest"/>For students. From students.</div><h1 className="max-w-xl text-[clamp(2.7rem,5.2vw,4.3rem)] leading-[1.07] font-semibold tracking-[-0.055em]">Students leaving have what <span className="text-forest">arriving students need.</span></h1><p className="mt-6 max-w-md text-base leading-7 text-muted">A new home for your old favorites. Handoff connects students leaving campus with students arriving, so useful things can start a new chapter, too.</p><div className="mt-8 flex flex-wrap gap-3"><Link className="button-primary" href="/leaving">I&apos;m Leaving</Link><Link className="button-secondary" href="/arriving">I&apos;m Arriving</Link></div><div className="mt-6 flex items-center gap-2 text-xs text-muted"><span className="text-forest" aria-hidden="true">♧</span>Less to pack. Less to buy. More to pass on.</div></div><div className="relative mx-auto w-full max-w-lg rounded-[32px] bg-[#e9eddf] px-6 pb-7 pt-8 sm:px-9"><div className="flex items-center justify-between"><span className="eyebrow">Good things, next chapter</span><span className="text-3xl text-forest/50" aria-hidden="true">✳</span></div><div className="relative mt-6 grid grid-cols-2 items-center gap-3"><div className="-rotate-5 rounded-2xl bg-white p-3 shadow-lg shadow-forest/10"><div className="rounded-xl bg-[#e8eee8]"><ItemArt kind="fridge" className="w-full"/></div><div className="flex justify-between gap-2 px-1 pb-2 pt-4 text-xs font-semibold"><span>Mini Fridge</span><span>$25</span></div><p className="px-1 pb-2 text-[10px] text-muted">Ready for another semester</p></div><div className="translate-y-8 rotate-6 rounded-2xl bg-white p-3 shadow-lg shadow-forest/10"><div className="rounded-xl bg-[#f1e6d6]"><ItemArt kind="kitchen" className="w-full"/></div><div className="flex justify-between gap-2 px-1 pb-2 pt-4 text-xs font-semibold"><span>Kitchen Set</span><span className="text-forest">FREE</span></div><p className="px-1 pb-2 text-[10px] text-muted">Your first meal starts here</p></div></div><div className="relative mx-auto mt-14 flex max-w-xs items-center justify-between gap-2 rounded-2xl border border-white/80 bg-[#f9faf3] px-5 py-4 shadow-sm"><div><p className="text-[10px] text-muted">One student moves on</p><p className="mt-1 text-sm font-semibold">Leaving campus</p></div><span className="rounded-full bg-[#e3ead9] p-2 text-forest"><Arrow /></span><div><p className="text-[10px] text-muted">Another settles in</p><p className="mt-1 text-sm font-semibold">Feeling at home</p></div></div><p className="mt-5 text-center text-[10px] tracking-wide text-muted">A small handoff. A big fresh start.</p></div></section><section id="how-it-works" className="border-y border-ink/10 bg-[#f0f2ea]"><div className="page-width grid gap-6 py-8 md:grid-cols-3">{[{ n: "01", title: "Share your timeline", text: "Leaving or arriving? Start with your campus and your date." }, { n: "02", title: "Find the everyday essentials", text: "From a warm coat to your first kitchen, see what’s available." }, { n: "03", title: "Keep good things going", text: "The idea is simple: less waste, more student-to-student kindness." }].map(step => <div key={step.n} className="flex gap-4"><span className="pt-1 text-xs font-semibold text-forest/50">{step.n}</span><div><h2 className="text-sm font-semibold">{step.title}</h2><p className="mt-2 max-w-xs text-xs leading-6 text-muted">{step.text}</p></div></div>)}</div></section><section className="page-width py-14 sm:py-18"><div className="flex flex-wrap items-end justify-between gap-4"><div><h2 className="mt-3 text-3xl font-semibold tracking-tight">Find your next home essential</h2><p className="mt-3 text-sm text-muted">Browse student listings and connect directly with the person passing them on.</p></div><Link href="/marketplace" className="text-sm font-semibold text-forest underline underline-offset-4">Browse marketplace</Link></div><div className="mt-9"><RecentListings /></div></section><section className="page-width pb-16"><div className="flex flex-col justify-between gap-6 rounded-3xl bg-forest p-8 text-white sm:flex-row sm:items-center sm:p-10"><div><p className="text-2xl font-semibold tracking-tight">New campus. Familiar comforts.</p><p className="mt-3 max-w-lg text-sm leading-6 text-white/75">Whether you’re moving across the country or across the world, a little help from another student goes a long way.</p></div><Link className="button-secondary shrink-0" href="/arriving">Find your essentials</Link></div></section></main>;
+  return <main>
+    <section className="page-width pb-16 pt-16 sm:pb-20 sm:pt-24">
+      <p className="label rise">For students. From students.</p>
+      <h1 className="display-xl rise mt-6 max-w-[15ch] text-forest" style={{ animationDelay: "60ms" }}>
+        Students leaving have what arriving students need.
+      </h1>
+      <p className="lede rise mt-8" style={{ animationDelay: "120ms" }}>
+        A new home for your old favorites. Handoff connects students leaving campus with students
+        arriving, so useful things can start a new chapter too.
+      </p>
+      <div className="rise mt-10 flex flex-wrap items-center gap-3" style={{ animationDelay: "180ms" }}>
+        <Link className="button-primary" href="/leaving">I&apos;m leaving</Link>
+        <Link className="button-secondary" href="/arriving">I&apos;m arriving</Link>
+      </div>
+      <p className="rise mt-8 text-sm text-muted" style={{ animationDelay: "240ms" }}>
+        Less to pack. Less to buy. More to pass on.
+      </p>
+    </section>
+
+    <section className="page-width pb-20">
+      <div className="rule flex flex-wrap items-baseline justify-between gap-4 pt-10">
+        <h2 className="display-lg">Ready for their next home</h2>
+        <Link href="/marketplace" className="text-sm font-medium text-forest underline underline-offset-4 decoration-forest/30 hover:decoration-forest">
+          Browse everything
+        </Link>
+      </div>
+      <div className="mt-8"><RecentListings /></div>
+    </section>
+
+    <section className="bg-sand py-16">
+      <div className="page-width grid gap-10 sm:grid-cols-3 sm:gap-8">
+        {steps.map(step => <div key={step.n}>
+          <p className="display font-display text-2xl text-forest/35">{step.n}</p>
+          <h3 className="mt-3 text-[0.9375rem] font-semibold">{step.title}</h3>
+          <p className="mt-2 text-sm leading-7 text-muted">{step.text}</p>
+        </div>)}
+      </div>
+    </section>
+
+    <section className="page-width py-20">
+      <div className="max-w-2xl">
+        <h2 className="display-lg">New campus. Familiar comforts.</h2>
+        <p className="lede mt-5">
+          Whether you are moving across the country or across the world, a little help from
+          another student goes a long way.
+        </p>
+        <Link className="button-primary mt-8" href="/arriving">Find your essentials</Link>
+      </div>
+    </section>
+  </main>;
 }
