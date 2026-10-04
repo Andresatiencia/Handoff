@@ -9,7 +9,7 @@ import { createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
 import { DatabaseSync } from "node:sqlite";
 
-test("real server: accounts, listings, private messages, and restart persistence", { timeout: 120000 }, async t => {
+test("real server: accounts, listings, bundles, private messages, and restart persistence", { timeout: 120000 }, async t => {
   const dir = await mkdtemp(join(tmpdir(), "handoff-backend-"));
   const database = join(dir, "test.sqlite");
   const socket = createServer();
@@ -60,7 +60,7 @@ test("real server: accounts, listings, private messages, and restart persistence
     };
   }
   const seller = client(), buyer = client(), stranger = client(), anonymous = client();
-  let sellerId, buyerId, listingId, threadId, secondThreadId, imageId;
+  let sellerId, buyerId, listingId, threadId, secondThreadId, imageId, bundleId;
   const item = { title: "Test desk lamp", description: "Working lamp for a dorm room.", university: campus,
     category: "Bedroom", price: 12.50, condition: "Good", availableFrom: "2026-12-10", availableUntil: "2026-12-17" };
 
@@ -114,6 +114,40 @@ test("real server: accounts, listings, private messages, and restart persistence
     assert.equal((await anonymous("listings?categories=Kitchen")).data.listings.length, 0);
     assert.equal((await anonymous("listings?arrival=bad")).status, 400);
     assert.equal((await anonymous("listings?university=Other")).status, 400);
+  });
+
+  await t.test("bundles group items and reserve atomically for one buyer", async () => {
+    const demos = await anonymous("bundles");
+    assert.equal(demos.status, 200);
+    assert.equal(demos.data.bundles.filter(bundle => bundle.demo).length, 5);
+    assert.equal(demos.data.bundles.find(bundle => bundle.id === "demo-kitchen").items.length, 6);
+    assert.equal((await buyer("bundles/demo-kitchen/claim", "POST")).status, 201);
+    assert.equal((await buyer("bundles/demo-kitchen")).data.bundle.claimedByMe, true);
+    assert.equal((await stranger("bundles/demo-kitchen")).data.bundle.status, "available");
+    const draft = { name: "Test Kitchen Starter Bundle", description: "Cooking basics for a new student.", university: campus,
+      price: 35, estimatedRetail: 120, availableFrom: "2026-12-10", availableUntil: "2026-12-17",
+      items: [{ name: "Plates", quantity: 4, condition: "Good", category: "Kitchen" }, { name: "Frying Pan", quantity: 1, condition: "Fair", category: "Kitchen" }] };
+    assert.equal((await anonymous("bundles", "POST", draft)).status, 401);
+    for (const invalid of [{ price: 1.234 }, { items: [draft.items[0]] }, { estimatedRetail: 20 }, { availableUntil: "2026-12-01" }]) {
+      assert.equal((await seller("bundles", "POST", { ...draft, ...invalid })).status, 400);
+    }
+    const created = await seller("bundles", "POST", draft);
+    assert.equal(created.status, 201);
+    bundleId = created.data.bundle.id;
+    assert.equal(created.data.bundle.sellerId, sellerId);
+    assert.equal(created.data.bundle.priceCents, 3500);
+    assert.equal(created.data.bundle.items.length, 2);
+    assert.equal((await buyer(`bundles/${bundleId}`)).data.bundle.status, "available");
+    assert.equal((await seller(`bundles/${bundleId}/claim`, "POST")).status, 400);
+    assert.equal((await anonymous(`bundles/${bundleId}/claim`, "POST")).status, 401);
+    const claimed = await buyer(`bundles/${bundleId}/claim`, "POST");
+    assert.equal(claimed.status, 201);
+    assert.equal(claimed.data.bundle.claimedByMe, true);
+    assert.equal(claimed.data.bundle.status, "reserved");
+    assert.equal((await buyer(`bundles/${bundleId}/claim`, "POST")).status, 200);
+    assert.equal((await stranger(`bundles/${bundleId}/claim`, "POST")).status, 409);
+    assert.equal((await stranger(`bundles/${bundleId}`)).data.bundle.claimedByMe, false);
+    assert.equal((await anonymous("bundles")).data.bundles.find(bundle => bundle.id === bundleId).status, "reserved");
   });
 
   await t.test("optional price bounds include endpoints and combine with other filters", async () => {
@@ -198,6 +232,7 @@ test("real server: accounts, listings, private messages, and restart persistence
     assert.equal((await seller("auth/me")).data.user.id, sellerId);
     assert.equal((await anonymous(`listings/${listingId}`)).data.listing.title, item.title);
     assert.equal((await buyer(`conversations/${threadId}/messages`)).data.messages.length, 2);
+    assert.equal((await buyer(`bundles/${bundleId}`)).data.bundle.claimedByMe, true);
   });
 
   await t.test("only the seller can delete a listing and its conversations, messages, and photo", async () => {

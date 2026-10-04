@@ -28,9 +28,12 @@ Both browsers must access the **same running Handoff server**. Different localho
 
 ## Implemented behavior
 
+Bundles: Sellers can open **Create a bundle** from the marketplace, group 2–12 named items with conditions and an availability window, and enter a bundle price and estimated new cost. Arriving students can add specific needs on the arrival form; cards calculate coverage, timing, and estimated savings. A signed-in buyer can reserve a whole bundle in one action. The five labeled demo bundles have personal demo reservations and do not arrange pickup; a bundle posted by a real account can be reserved by only one buyer.
+
 - Registration, sign-in, sign-out, seven-day server-side sessions, and account ownership.
 - Salted scrypt password hashes and random session tokens stored as SHA-256 hashes; HttpOnly, SameSite cookies, with Secure cookies when the configured origin uses HTTPS.
 - Persistent shared listings, seller status management and deletion, server validation, product photos, and prices stored as integer cents. The price form accepts at most two decimal places.
+- Seller-created bundles and database-backed reservations. Bundle matches and savings use entered items, needs, dates, and estimated retail values; no payment is collected.
 - Public browsing with category, search, status, university, inclusive arrival-date, and optional minimum/maximum price filters. Price ranges include their endpoints and can be shared through `minPrice` and `maxPrice` URL parameters.
 - Only University of Central Missouri is selectable; the API enforces this restriction.
 - Private per-buyer/per-listing conversations, sender identity from the session, and polling for new messages.
@@ -38,9 +41,11 @@ Both browsers must access the **same running Handoff server**. Different localho
 - Same-origin checks on writes, request-size limits, parameterized SQL, and participant/ownership checks.
 - Loading, empty, and error states. Failed writes do not display a success confirmation.
 
-Selecting a university is self-reported affiliation; it does not verify enrollment. Payments, email verification, password recovery, notifications, moderation, and automatic claiming are not implemented. Sellers reserve and close listings manually; pickup arrangements happen in messages. Deleting a listing also permanently removes its photo and associated conversations and messages. These are follow-up features, not simulated backend behavior.
+Selecting a university is self-reported affiliation; it does not verify enrollment. Payments, email verification, password recovery, notifications, moderation, and buyer claiming of individual listings are not implemented. Sellers reserve and close individual listings manually; pickup arrangements for those items happen in messages. Deleting a listing also permanently removes its photo and associated conversations and messages. These are follow-up features, not simulated backend behavior.
 
 ## Configuration and hosting
+
+Bundle claims reserve the grouped items in Handoff. Pickup coordination for bundles is not yet integrated with item messaging. Estimated new costs are seller-entered, and arrival needs travel in the marketplace URL rather than an account profile.
 
 See `.env.example`. Local file configuration is optional:
 
@@ -97,11 +102,12 @@ Integration tests require an existing production build. They launch isolated ser
 - `src/components/account.tsx`, `sell-form.tsx`, `marketplace.tsx`, `messages.tsx`: live application flows.
 - `tests/backend.test.mjs`: end-to-end API integration tests.
 
-Routes: `/`, `/account`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/messages`.
+Routes: `/`, `/account`, `/leaving`, `/arriving`, `/sell`, `/marketplace`, `/bundles/new`, `/bundles/:id`, `/messages`.
 
 API:
 - `GET /api/auth/me`; `POST /api/auth/register|login|logout`.
 - `GET/POST /api/listings`; `GET/PATCH/DELETE /api/listings/:id` (PATCH changes status; DELETE is seller-only); `GET /api/listings/:id/image`.
+- `GET/POST /api/bundles`; `GET /api/bundles/:id`; `POST /api/bundles/:id/claim`.
 - `GET/POST /api/conversations`.
 - `GET/POST /api/conversations/:id/messages`.
 

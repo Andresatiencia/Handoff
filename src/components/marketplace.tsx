@@ -9,6 +9,8 @@ import { useRemote } from "@/lib/api-client";
 import { CategorySelector } from "./category-selector";
 import { ListingCard } from "./listing-card";
 import { useAuth } from "./auth-provider";
+import { BundleCard } from "./bundle-card";
+import { bundleMatch, bundleTiming, moveInNeeds, type Bundle } from "@/lib/bundles";
 
 export function Marketplace() {
   const params = useSearchParams();
@@ -34,6 +36,16 @@ export function Marketplace() {
   if (appliedMaximum) filters.set("maxPrice", appliedMaximum);
   if (mine) filters.set("mine", "true");
   const { data, loading, error, refresh } = useRemote<{ listings: Listing[] }>(`listings?${filters}`, 10000);
+  const { data: bundleData, loading: bundlesLoading, error: bundlesError, refresh: refreshBundles } = useRemote<{ bundles: Bundle[] }>(mine ? null : "bundles", 10000);
+  const needs = moveInNeeds(params.get("needs"), params.get("categories"));
+  const bundleParams = new URLSearchParams();
+  for (const key of ["arrival", "categories", "needs"]) if (params.get(key)) bundleParams.set(key, params.get(key)!);
+  const bundleQuery = bundleParams.toString();
+  const bundles = (bundleData?.bundles ?? []).filter(bundle => bundle.university === UNIVERSITY).sort((a, b) => {
+    const rank = (bundle: Bundle) => bundleMatch(bundle, needs).percent ?? 0;
+    return (b.status === "available" ? 1 : 0) - (a.status === "available" ? 1 : 0)
+      || rank(b) - rank(a) || bundleTiming(b, arrival).rank - bundleTiming(a, arrival).rank;
+  });
   const visible = data?.listings ?? [];
   const posted = visible.find(item => item.id === Number(params.get("posted")));
 
@@ -75,6 +87,12 @@ export function Marketplace() {
     <div className="mt-5 flex gap-5 text-sm font-semibold text-forest"><Link href="/marketplace">All items</Link>{user && <Link href="/marketplace?mine=true">My listings</Link>}</div>
     {posted && <p role="status" className="mt-6 rounded-xl bg-sand p-4 text-sm">Your listing “{posted.title}” is live. Other students can now see it and message you.</p>}
     {arrival && <div className="mt-6 rounded-xl border border-forest/15 bg-sand p-4 text-sm"><p className="font-semibold">Arriving {arrival} at {UNIVERSITY}</p><label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={matchArrival} onChange={event => setMatchArrival(event.target.checked)} className="accent-forest" />Only show items available on my arrival date</label></div>}
+    {!mine && <section className="mt-10" aria-labelledby="bundles-heading">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow">Several essentials. One handoff.</p><h2 id="bundles-heading" className="mt-2 text-3xl font-semibold tracking-tight">Recommended move-in bundles</h2><p className="mt-2 text-sm text-muted">See how many of your needs each departing student can cover, when the items are ready, and what you could save.</p></div><Link href="/bundles/new" className="button-secondary">Create a bundle +</Link></div>
+      {bundlesLoading && <p role="status" className="text-sm text-muted">Loading bundles…</p>}
+      {bundlesError && <p role="alert" className="rounded-xl bg-white p-4 text-sm text-red-700">{bundlesError} <button onClick={refreshBundles} className="underline">Try again</button></p>}
+      {bundles.length > 0 && <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{bundles.map(bundle => <BundleCard key={bundle.id} bundle={bundle} arrival={arrival} needs={needs} href={`/bundles/${bundle.id}${bundleQuery ? `?${bundleQuery}` : ""}`} />)}</div>}
+    </section>}
     <div className="mt-8 rounded-2xl border border-ink/10 bg-white p-5 sm:p-6">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <label className="block w-full text-sm font-semibold sm:max-w-md">Find an essential<input type="search" maxLength={100} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search for a fridge, coat, lamp…" className="form-input mt-2" /></label>

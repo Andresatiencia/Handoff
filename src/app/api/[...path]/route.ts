@@ -3,6 +3,7 @@ import { deleteListing, row, rows, StorageUnavailable } from "@/lib/server/db";
 import { currentUser, requireUser, passwordHash, verifyPassword, startSession, endSession, limit } from "@/lib/server/auth";
 import { HttpError, text, date, university, listingInput, priceBound } from "@/lib/server/validation";
 import { getListing, listingSelect } from "@/lib/server/listings";
+import { bundleInput, getBundle, listBundles } from "@/lib/server/bundles";
 import { categories } from "@/lib/listings";
 import type { Conversation, User } from "@/lib/contracts";
 
@@ -105,6 +106,33 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       }
       const response = json({ user }, route === "auth/register" ? 201 : 200);
       await startSession(request, response, user.id); return response;
+    }
+    if (route === "bundles" && method === "GET") {
+      return json({ bundles: await listBundles((await currentUser(request))?.id ?? null) });
+    }
+    if (route === "bundles" && method === "POST") {
+      const user = await requireUser(request); await limit(`bundle:${user.id}`, 30, 3600000);
+      const data = bundleInput(await body(request));
+      const created = await row<{ id: number }>(`INSERT INTO bundles("sellerId",name,description,"itemsJson","priceCents","retailCents","availableFrom","availableUntil",university)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`, user.id, data.name, data.description, JSON.stringify(data.items), data.priceCents, data.retailCents, data.availableFrom, data.availableUntil, data.university);
+      return json({ bundle: await getBundle(`bundle-${created!.id}`, user.id) }, 201);
+    }
+    if (parts[0] === "bundles" && parts.length === 2 && method === "GET") {
+      const bundle = await getBundle(parts[1], (await currentUser(request))?.id ?? null);
+      if (!bundle) throw new HttpError(404, "Bundle not found.");
+      return json({ bundle });
+    }
+    if (parts[0] === "bundles" && parts.length === 3 && parts[2] === "claim" && method === "POST") {
+      const user = await requireUser(request); await limit(`claim:${user.id}`, 60, 3600000);
+      const bundle = await getBundle(parts[1], user.id);
+      if (!bundle) throw new HttpError(404, "Bundle not found.");
+      if (bundle.sellerId === user.id) throw new HttpError(400, "You cannot claim your own bundle.");
+      const claimKey = bundle.demo ? `${bundle.id}:${user.id}` : bundle.id;
+      const created = await row<{ bundleId: string }>(`INSERT INTO bundle_claims("bundleId","buyerId","claimedAt")
+        VALUES($1,$2,$3) ON CONFLICT("bundleId") DO NOTHING RETURNING "bundleId"`, claimKey, user.id, new Date().toISOString());
+      const updated = await getBundle(bundle.id, user.id);
+      if (!created && !updated?.claimedByMe) throw new HttpError(409, "This bundle has already been reserved.");
+      return json({ bundle: updated }, created ? 201 : 200);
     }
     if (route === "listings" && method === "GET") {
       const params = request.nextUrl.searchParams;
