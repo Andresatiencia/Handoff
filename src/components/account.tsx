@@ -24,10 +24,10 @@ export function Account() {
     event.preventDefault(); setError(""); setBusy(true);
     const fields = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      const result = await api<{ user: User; emailSent?: boolean }>(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify(fields) });
+      const result = await api<{ user: User; emailSent?: boolean; emailError?: string }>(`auth/${register ? "register" : "login"}`, { method: "POST", body: JSON.stringify(fields) });
       refresh();
       if (result.user.emailVerificationRequired) {
-        if (result.emailSent === false) setError("We could not send the verification email. Use the resend button below to try again.");
+        if (result.emailSent === false) setError(result.emailError ?? "We could not send the verification email. Use the resend button below to try again.");
         router.push("/account");
       } else router.push(next);
     } catch (error) { setError(error instanceof Error ? error.message : "Could not sign in."); }

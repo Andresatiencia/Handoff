@@ -312,6 +312,29 @@ test("real server: accounts, listings, bundles, private messages, and restart pe
     assert.equal((await seller(`listings/${free.data.listing.id}`, "DELETE")).status, 200);
   });
 
+  await t.test("delivery failures preserve the previous link and can be retried", async () => {
+    const pending = client();
+    const registered = await pending("auth/register", "POST", { name: "Pending student", email: "pending@example.com", password, university: campus });
+    assert.equal(registered.data.emailSent, true);
+    const original = await tokenFor("pending@example.com");
+    await stop(); await start(dir); // A directory cannot be used as the local test outbox.
+    const failed = await pending("auth/resend-verification", "POST");
+    assert.equal(failed.status, 503);
+    assert.match(failed.data.error, /could not send/i);
+    assert.equal((await pending("auth/verify-email", "POST", { token: original })).status, 200);
+    const another = client();
+    const unsent = await another("auth/register", "POST", { name: "Retry student", email: "retry@example.com", password, university: campus });
+    assert.equal(unsent.status, 201);
+    assert.equal(unsent.data.emailSent, false);
+    assert.equal(unsent.data.user.emailVerificationRequired, true);
+    const inspection = new DatabaseSync(database, { readOnly: true });
+    assert.equal(inspection.prepare("SELECT COUNT(*) AS count FROM email_verifications WHERE userId=?").get(unsent.data.user.id).count, 0);
+    inspection.close();
+    await stop(); await start();
+    assert.equal((await another("auth/resend-verification", "POST")).status, 200);
+    await verify(another, "retry@example.com");
+  });
+
   await t.test("without a mail provider, production keeps the existing signup behavior", async () => {
     await stop(); await start("");
     const account = client();

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteListing, row, rows, StorageUnavailable } from "@/lib/server/db";
 import { currentUser, requireUser, requireVerifiedUser, passwordHash, verifyPassword, startSession, endSession, limit } from "@/lib/server/auth";
-import { consumeVerification, issueVerification, verificationEnabled } from "@/lib/server/email-verification";
+import { consumeVerification, emailDeliveryMessage, issueVerification, verificationEnabled } from "@/lib/server/email-verification";
 import { HttpError, text, date, university, listingInput, priceBound } from "@/lib/server/validation";
 import { getListing, listingSelect } from "@/lib/server/listings";
 import { bundleInput, getBundle, listBundles } from "@/lib/server/bundles";
@@ -81,7 +81,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       if (!verificationEnabled()) throw new HttpError(503, "Email delivery is not configured yet. Please try again later.");
       await limit(`verify-email:${user.id}`, 3, 3600000);
       try { await issueVerification(user.id, user.email, process.env.APP_ORIGIN ?? request.nextUrl.origin); }
-      catch { throw new HttpError(503, "We could not send a verification email. Please try again later."); }
+      catch (error) { throw new HttpError(503, emailDeliveryMessage(error)); }
       return json({ sent: true });
     }
     if (route === "auth/verify-email" && method === "POST") {
@@ -101,6 +101,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       }
       let user: User;
       let emailSent: boolean | undefined;
+      let emailError: string | undefined;
       if (route === "auth/register") {
         const name = text(data.name, "Name", 60);
         const campus = university(data.university);
@@ -111,7 +112,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
           user = { id: Number(result!.id), name, email, university: campus, emailVerified: false, emailVerificationRequired: required };
           if (required) {
             try { await issueVerification(user.id, email, process.env.APP_ORIGIN ?? request.nextUrl.origin); emailSent = true; }
-            catch { emailSent = false; }
+            catch (error) { emailSent = false; emailError = emailDeliveryMessage(error); }
           }
         } catch (error) {
           if (String(error).toLowerCase().includes("unique") || (error as { code?: string }).code === "23505") throw new HttpError(409, "An account with this email already exists. Sign in instead.");
@@ -126,7 +127,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
         user = { id: account.id, name: account.name, email: account.email, university: account.university,
           emailVerified: Boolean(account.emailVerifiedAt && account.emailVerifiedAt !== "legacy"), emailVerificationRequired: account.emailVerifiedAt === null };
       }
-      const response = json({ user, emailSent }, route === "auth/register" ? 201 : 200);
+      const response = json({ user, emailSent, emailError }, route === "auth/register" ? 201 : 200);
       await startSession(request, response, user.id); return response;
     }
     if (route === "bundles" && method === "GET") {
